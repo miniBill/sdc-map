@@ -1,7 +1,6 @@
 {
   "devDependencies": {
     "elm-codegen": "^0.3.0",
-    "elm-watch": "^1.1.2",
-    "uglify-js": "^3.17.4"
+    "elm-watch": "^1.1.2"
   }
 }

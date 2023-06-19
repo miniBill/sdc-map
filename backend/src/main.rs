@@ -42,12 +42,7 @@ async fn main() -> Result<(), String> {
 
     let query = "
         CREATE TABLE IF NOT EXISTS answers (
-            name TEXT,
-            country TEXT,
-            location TEXT,
-            name_on_map INTEGER,
-            originally_from TEXT,
-            id TEXT,
+            encrypted TEXT,
             captcha TEXT
         )
     ";
@@ -96,23 +91,15 @@ fn handle_sqlite_error(
 
 async fn store_form(Json(payload): Json<Input>) -> sqlite::Result<(StatusCode, &'static str)> {
     let insert_query = "
-        INSERT INTO answers(name, country, location, name_on_map, originally_from, id, captcha)
-        VALUES (:name, :country, :location, :name_on_map, :originally_from, :id, :captcha)
+        INSERT INTO answers(encrypted, captcha)
+        VALUES (:encrypted, :captcha)
     ";
     let connection: MutexGuard<sqlite::Connection> = SQLITE_CONNECTION
         .lock()
         .expect("Cannot acquire SQL connection");
     let mut statement: sqlite::Statement = connection.prepare(insert_query)?;
     statement.bind::<&[(_, sqlite::Value)]>(&[
-        (":name", payload.name.into()),
-        (":country", payload.country.into()),
-        (":location", payload.location.into()),
-        (
-            ":name_on_map",
-            (if payload.name_on_map { 1 } else { 0 }).into(),
-        ),
-        (":originally_from", payload.originally_from.into()),
-        (":id", payload.id.into()),
+        (":encrypted", payload.encrypted.into()),
         (":captcha", payload.captcha.into()),
     ])?;
     while statement.next()? != sqlite::State::Done {}
@@ -123,11 +110,6 @@ async fn store_form(Json(payload): Json<Input>) -> sqlite::Result<(StatusCode, &
 // the input to our `create_user` handler
 #[derive(Serialize, Deserialize, Debug)]
 struct Input {
-    name: String,
-    country: String,
-    location: String,
-    name_on_map: bool,
-    originally_from: String,
-    id: String,
+    encrypted: String,
     captcha: String,
 }

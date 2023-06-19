@@ -1,1 +1,1 @@
-- make bundle small by codegenning out unused data
+- write privacy policy

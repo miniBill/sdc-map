@@ -35,8 +35,11 @@ let
           echo "replacing unminified main.js with the minified one"
           mv $out/main.min.js $out/main.js
 
-          echo "Copying over index.html"
-          cp src/index.html $out
+          echo "copying over index.{html,js}"
+          cp src/index.{html,js} $out
+
+          echo "copying vendored deps"
+          cp -r vendor/*.js $out
         '';
     };
 in

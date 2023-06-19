@@ -1,4 +1,4 @@
-module Main exposing (Flags, Model, Msg, main)
+port module Main exposing (Flags, Model, Msg, main)
 
 import Browser
 import Dict
@@ -10,9 +10,15 @@ import Element.Input as Input
 import Html
 import Html.Attributes
 import Http
-import Json.Encode
+import Json.Encode exposing (Value)
 import Subdivisions
 import Theme
+
+
+port encrypt : Value -> Cmd msg
+
+
+port encrypted : (String -> msg) -> Sub msg
 
 
 type alias Input =
@@ -30,8 +36,13 @@ type alias Flags =
     {}
 
 
+type EncryptedString
+    = EncryptedString String
+
+
 type Model
     = Filling Input (Maybe Error)
+    | Encrypting Input
     | Submitting Input
     | Submitted Input
 
@@ -51,6 +62,7 @@ type Msg
     | Edit
     | SubmitResult (Result Http.Error String)
     | Submit
+    | Encrypted EncryptedString
 
 
 main : Program Flags Model Msg
@@ -112,6 +124,16 @@ view model =
 
                   else
                     Element.none
+                ]
+
+        Encrypting input ->
+            Theme.column
+                [ Theme.padding
+                , centerX
+                ]
+                [ viewInputReadonly input
+                , el [] <| text " "
+                , text "Encrypting..."
                 ]
 
         Submitting input ->
@@ -298,11 +320,21 @@ update msg model =
             ( Filling { input | captcha = captcha } maybeError, Cmd.none )
 
         ( Submit, Filling input _ ) ->
+            ( Encrypting input
+            , encrypt <| encodeInput input
+            )
+
+        ( Encrypted encryptedString, Encrypting input ) ->
             ( Submitting input
             , Http.post
                 { url = "/submit"
                 , expect = Http.expectString SubmitResult
-                , body = Http.jsonBody <| encodeInput input
+                , body =
+                    { input = input
+                    , encrypted = encryptedString
+                    }
+                        |> encodeForServer
+                        |> Http.jsonBody
                 }
             )
 
@@ -317,6 +349,14 @@ update msg model =
 
         _ ->
             ( model, Cmd.none )
+
+
+encodeForServer : { input : Input, encrypted : EncryptedString } -> Value
+encodeForServer arg =
+    [ ( "encrypted", (\(EncryptedString es) -> Json.Encode.string es) arg.encrypted )
+    , ( "captcha", Json.Encode.string arg.input.captcha )
+    ]
+        |> Json.Encode.object
 
 
 errorToString : Http.Error -> Error
@@ -338,7 +378,7 @@ errorToString error =
             "Unexpected answer from the server"
 
 
-encodeInput : Input -> Json.Encode.Value
+encodeInput : Input -> Value
 encodeInput input =
     [ ( "name", Json.Encode.string input.name )
     , ( "country", Json.Encode.string input.country )
@@ -353,4 +393,4 @@ encodeInput input =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    encrypted (\result -> Encrypted <| EncryptedString result)

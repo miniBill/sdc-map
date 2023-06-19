@@ -30,11 +30,11 @@
       "locked": {
         "lastModified": 1,
         "narHash": "sha256-s4U8ncNtT45J6MijhYcm+YdG6aE4WAryAmemkyLmecY=",
-        "path": "../frontend",
+        "path": "/nix/store/1j03hq3qp8fnb3wk4r50pv7xy9jcjxmx-source/frontend",
         "type": "path"
       },
       "original": {
-        "path": "../frontend",
+        "path": "/nix/store/1j03hq3qp8fnb3wk4r50pv7xy9jcjxmx-source/frontend",
         "type": "path"
       }
     },

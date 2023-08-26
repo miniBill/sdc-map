@@ -2,17 +2,18 @@ port module Main exposing (Flags, Model, Msg, main)
 
 import Browser
 import Dict
-import Element exposing (Element, centerX, el, fill, height, paragraph, shrink, text, width)
-import Element.Background as Background
-import Element.Border as Border
-import Element.Font as Font
-import Element.Input as Input
 import Html
 import Html.Attributes
 import Http
 import Json.Encode exposing (Value)
 import Subdivisions
 import Theme
+import Ui exposing (Element, centerX, el, fill, height, rgb, text, width)
+import Ui.Events
+import Ui.Font as Font
+import Ui.Input as Input
+import Ui.Prose exposing (paragraph)
+import Ui.Table as Table
 
 
 port encrypt : Value -> Cmd msg
@@ -71,7 +72,7 @@ main =
         { init = init
         , view =
             \flagsModel ->
-                Element.layout
+                Ui.layout
                     [ width fill
                     , height fill
                     , Theme.padding
@@ -112,18 +113,17 @@ view model =
                         viewError error
 
                     Nothing ->
-                        Element.none
+                        Ui.none
                 , if isValid input then
-                    Input.button
-                        [ Theme.padding
-                        , Border.width 1
+                    Ui.el
+                        [ Ui.Events.onClick Submit
+                        , Theme.padding
+                        , Ui.border 1
                         ]
-                        { onPress = Just Submit
-                        , label = text "Submit"
-                        }
+                        (text "Submit")
 
                   else
-                    Element.none
+                    Ui.none
                 ]
 
         Encrypting input ->
@@ -156,12 +156,10 @@ view model =
                     [ text "Thank you for your submission 😊" ]
                 , paragraph []
                     [ text "If you want to change anything, just "
-                    , Input.button []
-                        { onPress = Just Edit
-                        , label =
-                            el [ Font.underline ] <|
-                                text "edit and submit again."
-                        }
+                    , Ui.el [ Ui.Events.onClick Edit ]
+                        (el [ Font.underline ] <|
+                            text "edit and submit again."
+                        )
                     ]
                 ]
 
@@ -178,45 +176,47 @@ isValid { name, country, captcha } =
 viewInputReadonly : Input -> Element Msg
 viewInputReadonly input =
     let
-        inputRow : String -> String -> ( Element msg, Element a )
+        inputRow : String -> String -> ( Table.Cell msg, Table.Cell msg )
         inputRow label value =
-            ( el [ Font.alignRight ] <| text <| label ++ ": "
-            , el [ Font.bold ] <| text value
+            ( Table.cell [ Font.alignRight ] <| text <| label ++ ": "
+            , Table.cell [ Font.weight Font.bold ] <| text value
             )
-    in
-    Element.table [ Theme.spacing ]
-        { data =
-            [ inputRow "Name" input.name
-            , inputRow "Country" input.country
-            , inputRow "Location" input.location
-            , inputRow "Name on map"
-                (if input.nameOnMap then
-                    "Yes"
 
-                 else
-                    "No"
-                )
-            , inputRow "Originally from" input.originallyFrom
-            , inputRow "Id" input.id
-            ]
-        , columns =
-            [ { header = Element.none
-              , view = Tuple.first
-              , width = shrink
-              }
-            , { header = Element.none
-              , view = Tuple.second
-              , width = fill
-              }
-            ]
-        }
+        config : Table.Config () ( Table.Cell msg, Table.Cell msg ) msg
+        config =
+            Table.columns
+                [ Table.column
+                    { header = Table.cell [] Ui.none
+                    , view = Tuple.first
+                    }
+                , Table.column
+                    { header = Table.cell [] Ui.none
+                    , view = Tuple.second
+                    }
+                ]
+    in
+    Table.view [ Ui.width Ui.shrink, Theme.spacing ]
+        config
+        [ inputRow "Name" input.name
+        , inputRow "Country" input.country
+        , inputRow "Location" input.location
+        , inputRow "Name on map"
+            (if input.nameOnMap then
+                "Yes"
+
+             else
+                "No"
+            )
+        , inputRow "Originally from" input.originallyFrom
+        , inputRow "Id" input.id
+        ]
 
 
 viewError : String -> Element Msg
 viewError message =
     ("Error: " ++ message)
         |> text
-        |> el [ Background.color <| Element.rgb 1 0.8 0.8 ]
+        |> el [ Ui.background <| Ui.rgb 255 204 204 ]
 
 
 viewInput : Input -> Element Msg
@@ -234,7 +234,7 @@ viewInput input =
                    else
                     Html.Attributes.list (autocomplete ++ "-list")
                  ]
-                    |> List.map Element.htmlAttribute
+                    |> List.map Ui.htmlAttribute
                 )
                 { label = toLabel label description mandatory
                 , text = value
@@ -250,30 +250,34 @@ viewInput input =
                     )
                 |> Html.datalist
                     [ Html.Attributes.id (autocomplete ++ "-list") ]
-                |> Element.html
+                |> Ui.html
             ]
 
         checkboxRow : String -> String -> Bool -> (Bool -> Msg) -> Bool -> Element Msg
         checkboxRow label description mandatory toMsg value =
-            Input.checkbox []
+            Input.checkbox [ Ui.width Ui.shrink ]
                 { label = toLabel label description mandatory
                 , checked = value
                 , onChange = toMsg
-                , icon = Input.defaultCheckbox
+                , icon = Nothing
                 }
 
         toLabel : String -> String -> Bool -> Input.Label Msg
         toLabel label description mandatory =
-            Input.labelAbove [] <|
+            Input.labelAbove [ Ui.width Ui.shrink ] <|
                 paragraph []
                     [ text label
                     , if mandatory then
-                        el [ Font.color <| Element.rgb 1 0 0 ] <| text "*"
+                        el [ Font.color <| Ui.rgb 255 0 0 ] <| text "*"
 
                       else
-                        Element.none
+                        Ui.none
                     , text " "
-                    , el [ Font.size 14, Font.color <| Element.rgb 0.6 0.6 0.6 ] <| text description
+                    , el
+                        [ Font.size 14
+                        , Font.color <| Ui.rgb 153 153 153
+                        ]
+                        (text description)
                     ]
 
         locations : List String

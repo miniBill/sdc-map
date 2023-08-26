@@ -1,16 +1,16 @@
 module Theme exposing (column, padding, spacing)
 
-import Element exposing (Attribute, Element)
+import Ui exposing (Attribute, Element)
 
 
 padding : Attribute msg
 padding =
-    Element.padding rythm
+    Ui.padding rythm
 
 
 spacing : Attribute msg
 spacing =
-    Element.spacing rythm
+    Ui.spacing rythm
 
 
 rythm : number
@@ -20,4 +20,4 @@ rythm =
 
 column : List (Attribute msg) -> List (Element msg) -> Element msg
 column attrs =
-    Element.column (spacing :: attrs)
+    Ui.column (spacing :: attrs)

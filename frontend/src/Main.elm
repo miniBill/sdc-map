@@ -25,7 +25,7 @@ type alias Input =
     { name : String
     , country : String
     , location : String
-    , nameOnMap : Bool
+    , nameOnMap : Maybe Bool
     , id : String
     , captcha : String
     }
@@ -86,7 +86,7 @@ init _ =
         { name = ""
         , country = ""
         , location = ""
-        , nameOnMap = True
+        , nameOnMap = Nothing
         , captcha = ""
         , id = ""
         }
@@ -187,11 +187,15 @@ viewInputReadonly input =
             , inputRow "Country" input.country
             , inputRow "Location" input.location
             , inputRow "Name on map"
-                (if input.nameOnMap then
-                    "Yes"
+                (case input.nameOnMap of
+                    Just True ->
+                        "Yes"
 
-                 else
-                    "No"
+                    Just False ->
+                        "No"
+
+                    Nothing ->
+                        ""
                 )
             , inputRow "Id" input.id
             ]
@@ -249,13 +253,16 @@ viewInput input =
                 |> Element.html
             ]
 
-        checkboxRow : String -> String -> Bool -> (Bool -> Msg) -> Bool -> Element Msg
-        checkboxRow label description mandatory toMsg value =
-            Input.checkbox []
+        yesNoRow : String -> String -> Bool -> (Bool -> Msg) -> Maybe Bool -> Element Msg
+        yesNoRow label description mandatory toMsg value =
+            Input.radioRow [ Theme.spacing ]
                 { label = toLabel label description mandatory
-                , checked = value
+                , selected = value
                 , onChange = toMsg
-                , icon = Input.defaultCheckbox
+                , options =
+                    [ Input.option True <| text "Yes"
+                    , Input.option False <| text "No"
+                    ]
                 }
 
         toLabel : String -> String -> Bool -> Input.Label Msg
@@ -280,8 +287,8 @@ viewInput input =
     in
     [ inputRow "name" "Name" "" True Name input.name []
     , inputRow "country" "Country" "" True Country input.country (Dict.keys Subdivisions.subdivisions)
-    , inputRow "location" "Location" "Where are you from? Pick the name of the region, or a big city near you. DON'T provide your address." False Location input.location locations
-    , [ checkboxRow "Show name on map" "Should your name be shown on the map, or just used for statistics?" True NameOnMap input.nameOnMap ]
+    , inputRow "location" "Location" "Where are you from? Pick the name of the region, county, or a big city near you. DON'T provide your address." False Location input.location locations
+    , [ yesNoRow "Show name on map" "Should your name be shown on the map, or just used for statistics?" True NameOnMap input.nameOnMap ]
     , inputRow "contact" "Contact" "Some contact (email/twitter/discord/...) you can use to prove your identity if you want to remove your information." False Id input.id []
     , inputRow "captcha" "Anti-bot" "What is the title of her first album?" True Captcha input.captcha []
     ]
@@ -306,7 +313,7 @@ update msg model =
             ( Filling { input | location = location } maybeError, Cmd.none )
 
         ( NameOnMap nameOnMap, Filling input maybeError ) ->
-            ( Filling { input | nameOnMap = nameOnMap } maybeError, Cmd.none )
+            ( Filling { input | nameOnMap = Just nameOnMap } maybeError, Cmd.none )
 
         ( Captcha captcha, Filling input maybeError ) ->
             ( Filling { input | captcha = captcha } maybeError, Cmd.none )
@@ -372,13 +379,16 @@ errorToString error =
 
 encodeInput : Input -> Value
 encodeInput input =
-    [ ( "name", Json.Encode.string input.name )
-    , ( "country", Json.Encode.string input.country )
-    , ( "location", Json.Encode.string input.location )
-    , ( "name_on_map", Json.Encode.bool input.nameOnMap )
-    , ( "id", Json.Encode.string input.id )
-    , ( "captcha", Json.Encode.string input.captcha )
+    [ Just ( "name", Json.Encode.string input.name )
+    , Just ( "country", Json.Encode.string input.country )
+    , Just ( "location", Json.Encode.string input.location )
+    , Maybe.map
+        (\nameOnMap -> ( "name_on_map", Json.Encode.bool nameOnMap ))
+        input.nameOnMap
+    , Just ( "id", Json.Encode.string input.id )
+    , Just ( "captcha", Json.Encode.string input.captcha )
     ]
+        |> List.filterMap identity
         |> Json.Encode.object
 
 

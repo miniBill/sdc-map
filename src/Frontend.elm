@@ -1,6 +1,7 @@
-port module Main exposing (Flags, Model, Msg, main)
+module Frontend exposing (app)
 
-import Browser
+import Browser exposing (Document, UrlRequest)
+import Browser.Navigation
 import Dict
 import Element exposing (Element, centerX, el, fill, height, paddingEach, paragraph, shrink, text, width)
 import Element.Background as Background
@@ -9,79 +10,60 @@ import Element.Font as Font
 import Element.Input as Input
 import Html
 import Html.Attributes
-import Http
-import Json.Encode exposing (Value)
+import Json.Encode
+import Lamdera exposing (Url)
+import PkgPorts
 import Subdivisions
 import Theme
+import Types exposing (EncryptedString(..), FrontendModel(..), FrontendMsg(..), Input, ToBackend(..), ToFrontend(..))
 
 
-port encrypt : Value -> Cmd msg
-
-
-port encrypted : (String -> msg) -> Sub msg
-
-
-type alias Input =
-    { name : String
-    , country : String
-    , location : String
-    , nameOnMap : Maybe Bool
-    , id : String
-    , captcha : String
+app :
+    { init : Lamdera.Url -> Browser.Navigation.Key -> ( FrontendModel, Cmd FrontendMsg )
+    , view : FrontendModel -> Document FrontendMsg
+    , update : FrontendMsg -> FrontendModel -> ( FrontendModel, Cmd FrontendMsg )
+    , updateFromBackend : ToFrontend -> FrontendModel -> ( FrontendModel, Cmd FrontendMsg )
+    , subscriptions : FrontendModel -> Sub FrontendMsg
+    , onUrlRequest : UrlRequest -> FrontendMsg
+    , onUrlChange : Url -> FrontendMsg
     }
-
-
-type alias Flags =
-    {}
-
-
-type EncryptedString
-    = EncryptedString String
-
-
-type Model
-    = Filling Input (Maybe Error)
-    | Encrypting Input
-    | Submitting Input
-    | Submitted Input
-
-
-type alias Error =
-    String
-
-
-type Msg
-    = Name String
-    | Country String
-    | Location String
-    | NameOnMap Bool
-    | Id String
-    | Captcha String
-    | Edit
-    | SubmitResult (Result Http.Error String)
-    | Submit
-    | Encrypted EncryptedString
-
-
-main : Program Flags Model Msg
-main =
-    Browser.element
+app =
+    Lamdera.frontend
         { init = init
         , view =
             \flagsModel ->
-                Element.layout
-                    [ width fill
-                    , height fill
-                    , Theme.padding
+                { title = "SDC map"
+                , body =
+                    [ Element.layout
+                        [ width fill
+                        , height fill
+                        , Theme.padding
+                        ]
+                        (view flagsModel)
                     ]
-                    (view flagsModel)
+                }
         , update = update
         , subscriptions = subscriptions
+        , onUrlChange = \_ -> Nop
+        , onUrlRequest = \_ -> Nop
+        , updateFromBackend = updateFromBackend
         }
 
 
-init : Flags -> ( Model, Cmd Msg )
-init _ =
+updateFromBackend : ToFrontend -> FrontendModel -> ( FrontendModel, Cmd FrontendMsg )
+updateFromBackend msg model =
+    case msg of
+        TFSubmitted { id } ->
+            case model of
+                Submitting input ->
+                    ( Submitted { id = id, input = input }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+
+init : Lamdera.Url -> Browser.Navigation.Key -> ( FrontendModel, Cmd FrontendMsg )
+init _ _ =
     ( Filling
         { name = ""
         , country = ""
@@ -95,7 +77,7 @@ init _ =
     )
 
 
-view : Model -> Element Msg
+view : FrontendModel -> Element FrontendMsg
 view model =
     case model of
         Filling input maybeError ->
@@ -143,7 +125,7 @@ view model =
                 , text "Submitting..."
                 ]
 
-        Submitted input ->
+        Submitted { input, id } ->
             Theme.column
                 [ Theme.padding
                 , centerX
@@ -152,13 +134,9 @@ view model =
                 , paragraph []
                     [ text "Thank you for your submission 😊" ]
                 , paragraph []
-                    [ text "If you want to change anything, just "
-                    , Input.button []
-                        { onPress = Just Edit
-                        , label =
-                            el [ Font.underline ] <|
-                                text "edit and submit again."
-                        }
+                    [ text <|
+                        "You can ask for your data to be removed using your contact info, or with this id: "
+                            ++ id
                     ]
                 ]
 
@@ -173,7 +151,7 @@ isValid { name, country, captcha, nameOnMap } =
         |> not
 
 
-viewInputReadonly : Input -> Element Msg
+viewInputReadonly : Input -> Element FrontendMsg
 viewInputReadonly input =
     let
         inputRow : String -> String -> ( Element msg, Element a )
@@ -213,17 +191,17 @@ viewInputReadonly input =
         }
 
 
-viewError : String -> Element Msg
+viewError : String -> Element FrontendMsg
 viewError message =
     ("Error: " ++ message)
         |> text
         |> el [ Background.color <| Element.rgb 1 0.8 0.8 ]
 
 
-viewInput : Input -> Element Msg
+viewInput : Input -> Element FrontendMsg
 viewInput input =
     let
-        inputRow : String -> String -> String -> Bool -> (String -> Msg) -> String -> List String -> List (Element Msg)
+        inputRow : String -> String -> String -> Bool -> (String -> FrontendMsg) -> String -> List String -> List (Element FrontendMsg)
         inputRow autocomplete label description mandatory toMsg value autocompleteList =
             [ Input.text
                 ([ Html.Attributes.autocomplete True
@@ -254,7 +232,7 @@ viewInput input =
                 |> Element.html
             ]
 
-        yesNoRow : String -> String -> Bool -> (Bool -> Msg) -> Maybe Bool -> Element Msg
+        yesNoRow : String -> String -> Bool -> (Bool -> FrontendMsg) -> Maybe Bool -> Element FrontendMsg
         yesNoRow label description mandatory toMsg value =
             Input.radioRow [ Theme.spacing ]
                 { label = toLabel label description mandatory
@@ -266,7 +244,7 @@ viewInput input =
                     ]
                 }
 
-        toLabel : String -> String -> Bool -> Input.Label Msg
+        toLabel : String -> String -> Bool -> Input.Label FrontendMsg
         toLabel label description mandatory =
             Input.labelAbove
                 [ paddingEach
@@ -306,7 +284,7 @@ viewInput input =
         |> Theme.column []
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : FrontendMsg -> FrontendModel -> ( FrontendModel, Cmd FrontendMsg )
 update msg model =
     case ( msg, model ) of
         ( Id id, Filling input maybeError ) ->
@@ -329,64 +307,19 @@ update msg model =
 
         ( Submit, Filling input _ ) ->
             ( Encrypting input
-            , encrypt <| encodeInput input
+            , PkgPorts.encrypt <| encodeInput input
             )
 
         ( Encrypted encryptedString, Encrypting input ) ->
             ( Submitting input
-            , Http.post
-                { url = "/submit"
-                , expect = Http.expectString SubmitResult
-                , body =
-                    { input = input
-                    , encrypted = encryptedString
-                    }
-                        |> encodeForServer
-                        |> Http.jsonBody
-                }
+            , Lamdera.sendToBackend <| TBSubmit encryptedString
             )
-
-        ( SubmitResult (Ok _), Submitting input ) ->
-            ( Submitted input, Cmd.none )
-
-        ( SubmitResult (Err error), Submitting input ) ->
-            ( Filling input (Just <| errorToString error), Cmd.none )
-
-        ( Edit, Submitted input ) ->
-            ( Filling input Nothing, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
 
 
-encodeForServer : { input : Input, encrypted : EncryptedString } -> Value
-encodeForServer arg =
-    [ ( "encrypted", (\(EncryptedString es) -> Json.Encode.string es) arg.encrypted )
-    , ( "captcha", Json.Encode.string arg.input.captcha )
-    ]
-        |> Json.Encode.object
-
-
-errorToString : Http.Error -> Error
-errorToString error =
-    case error of
-        Http.BadBody _ ->
-            "Unexpected answer from the server"
-
-        Http.BadUrl _ ->
-            "Unexpected connection error"
-
-        Http.Timeout ->
-            "Timeout"
-
-        Http.NetworkError ->
-            "Connection issue"
-
-        Http.BadStatus _ ->
-            "Unexpected answer from the server"
-
-
-encodeInput : Input -> Value
+encodeInput : Input -> String
 encodeInput input =
     [ Just ( "name", Json.Encode.string input.name )
     , Just ( "country", Json.Encode.string input.country )
@@ -399,8 +332,9 @@ encodeInput input =
     ]
         |> List.filterMap identity
         |> Json.Encode.object
+        |> Json.Encode.encode 0
 
 
-subscriptions : Model -> Sub Msg
+subscriptions : FrontendModel -> Sub FrontendMsg
 subscriptions _ =
-    encrypted (\result -> Encrypted <| EncryptedString result)
+    PkgPorts.encrypted (\result -> Encrypted <| EncryptedString result)

@@ -2886,10 +2886,10 @@ function encrypt(input, publicKey, secretKey) {
   return bytesToBase64(fullMessage);
 }
 
-export function init(app) {
+exports.init = function (app) {
   app.ports.encrypt.subscribe(function (input) {
     app.ports.encrypted.send(
-      encrypt(JSON.stringify(input), serverPair.publicKey, userPair.secretKey)
+      encrypt(input, serverPair.publicKey, userPair.secretKey)
     );
   });
-}
+};

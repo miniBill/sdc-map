@@ -2,7 +2,7 @@ port module Main exposing (Flags, Model, Msg, main)
 
 import Browser
 import Dict
-import Element exposing (Element, centerX, el, fill, height, paragraph, shrink, text, width)
+import Element exposing (Element, centerX, el, fill, height, paddingEach, paragraph, shrink, text, width)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -164,10 +164,11 @@ view model =
 
 
 isValid : Input -> Bool
-isValid { name, country, captcha } =
+isValid { name, country, captcha, nameOnMap } =
     (String.isEmpty name
         || String.isEmpty country
         || String.isEmpty captcha
+        || (nameOnMap == Nothing)
     )
         |> not
 
@@ -189,10 +190,10 @@ viewInputReadonly input =
             , inputRow "Name on map"
                 (case input.nameOnMap of
                     Just True ->
-                        "Yes"
+                        "Show on map"
 
                     Just False ->
-                        "No"
+                        "Only statistics"
 
                     Nothing ->
                         ""
@@ -260,14 +261,22 @@ viewInput input =
                 , selected = value
                 , onChange = toMsg
                 , options =
-                    [ Input.option True <| text "Yes"
-                    , Input.option False <| text "No"
+                    [ Input.option True <| text "Show on map"
+                    , Input.option False <| text "Only statistics"
                     ]
                 }
 
         toLabel : String -> String -> Bool -> Input.Label Msg
         toLabel label description mandatory =
-            Input.labelAbove [] <|
+            Input.labelAbove
+                [ paddingEach
+                    { top = 0
+                    , left = 0
+                    , right = 0
+                    , bottom = Theme.rythm // 2
+                    }
+                ]
+            <|
                 paragraph []
                     [ text label
                     , if mandatory then
@@ -276,7 +285,7 @@ viewInput input =
                       else
                         Element.none
                     , text " "
-                    , el [ Font.size 14, Font.color <| Element.rgb 0.6 0.6 0.6 ] <| text description
+                    , el [ Font.size 14, Font.color <| Element.rgb 0.4 0.4 0.4 ] <| text description
                     ]
 
         locations : List String
@@ -289,7 +298,7 @@ viewInput input =
     , inputRow "country" "Country" "" True Country input.country (Dict.keys Subdivisions.subdivisions)
     , inputRow "location" "Location" "Where are you from? Pick the name of the region, county, or a big city near you. DON'T provide your address." False Location input.location locations
     , [ yesNoRow "Show name on map" "Should your name be shown on the map, or just used for statistics?" True NameOnMap input.nameOnMap ]
-    , inputRow "contact" "Contact" "Some contact (email/twitter/discord/...) you can use to prove your identity if you want to remove your information." False Id input.id []
+    , inputRow "contact" "Contact" "Some contact (email/twitter/discord/...) you can use to prove it's you if you want to remove your information. Will not be published in any form." False Id input.id []
     , inputRow "captcha" "Anti-bot" "What is the title of her first album?" True Captcha input.captcha []
     ]
         |> List.intersperse [ text " " ]

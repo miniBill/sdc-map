@@ -1,1 +1,2 @@
 - write privacy policy
+- Show name on map: yes, no, undefined, mandatory answer

@@ -26,7 +26,6 @@ type alias Input =
     , country : String
     , location : String
     , nameOnMap : Bool
-    , bornIn : String
     , id : String
     , captcha : String
     }
@@ -56,7 +55,6 @@ type Msg
     | Country String
     | Location String
     | NameOnMap Bool
-    | BornIn String
     | Id String
     | Captcha String
     | Edit
@@ -89,7 +87,6 @@ init _ =
         , country = ""
         , location = ""
         , nameOnMap = True
-        , bornIn = ""
         , captcha = ""
         , id = ""
         }
@@ -196,7 +193,6 @@ viewInputReadonly input =
                  else
                     "No"
                 )
-            , inputRow "Born in" input.bornIn
             , inputRow "Id" input.id
             ]
         , columns =
@@ -286,7 +282,6 @@ viewInput input =
     , inputRow "country" "Country" "" True Country input.country (Dict.keys Subdivisions.subdivisions)
     , inputRow "location" "Location" "Where are you from? Pick the name of the region, or a big city near you. DON'T provide your address." False Location input.location locations
     , [ checkboxRow "Show name on map" "Should your name be shown on the map, or just used for statistics?" True NameOnMap input.nameOnMap ]
-    , inputRow "born" "Born in" "Which country where you born in?" False BornIn input.bornIn []
     , inputRow "contact" "Contact" "Some contact (email/twitter/discord/...) you can use to prove your identity if you want to remove your information." False Id input.id []
     , inputRow "captcha" "Anti-bot" "What is the title of her first album?" True Captcha input.captcha []
     ]
@@ -312,9 +307,6 @@ update msg model =
 
         ( NameOnMap nameOnMap, Filling input maybeError ) ->
             ( Filling { input | nameOnMap = nameOnMap } maybeError, Cmd.none )
-
-        ( BornIn bornIn, Filling input maybeError ) ->
-            ( Filling { input | bornIn = bornIn } maybeError, Cmd.none )
 
         ( Captcha captcha, Filling input maybeError ) ->
             ( Filling { input | captcha = captcha } maybeError, Cmd.none )
@@ -384,7 +376,6 @@ encodeInput input =
     , ( "country", Json.Encode.string input.country )
     , ( "location", Json.Encode.string input.location )
     , ( "name_on_map", Json.Encode.bool input.nameOnMap )
-    , ( "born_in", Json.Encode.string input.bornIn )
     , ( "id", Json.Encode.string input.id )
     , ( "captcha", Json.Encode.string input.captcha )
     ]

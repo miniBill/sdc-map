@@ -2835,5 +2835,61 @@ const defined = (function () {
   return nacl;
 })();
 
-export const box = defined.box;
-export const randomBytes = defined.randomBytes;
+const box = defined.box;
+const randomBytes = defined.randomBytes;
+
+// Written by Leonardo Taglialegne
+
+function stringToByteArray(s) {
+  if (typeof s !== "string") throw new TypeError("expected string");
+  var enc = new TextEncoder(); // always utf-8
+  return enc.encode(s);
+}
+
+/**
+ * Converts a string to base64
+ * @param {string} base64
+ * @returns {Uint8Array}
+ */
+function base64ToBytes(base64) {
+  const binString = atob(base64);
+  return Uint8Array.from(binString, (m) => m.codePointAt(0));
+}
+
+/**
+ * Converts a string to base64
+ * @param {Uint8Array} base64
+ * @returns {string}
+ */
+function bytesToBase64(bytes) {
+  const binString = Array.from(bytes, (x) => String.fromCodePoint(x)).join("");
+  return btoa(binString);
+}
+
+// Written by Leonardo Taglialegne
+
+const userPair = box.keyPair();
+const serverPair = box.keyPair();
+
+function encrypt(input, publicKey, secretKey) {
+  const nonce = randomBytes(box.nonceLength);
+  const messageUint8 = stringToByteArray(input);
+  const encrypted = box(messageUint8, nonce, publicKey, secretKey);
+
+  const fullMessage = new Uint8Array(
+    nonce.length + encrypted.length + userPair.publicKey.length
+  );
+  fullMessage.set(nonce);
+  fullMessage.set(userPair.publicKey, nonce.length);
+  fullMessage.set(encrypted, nonce.length + userPair.publicKey.length);
+
+  return bytesToBase64(fullMessage);
+}
+
+export function init(app) {
+  app.ports.encrypt.subscribe(function (input) {
+    app.ports.encrypted.send(
+      encrypt(JSON.stringify(input), serverPair.publicKey, userPair.secretKey)
+    );
+  });
+}

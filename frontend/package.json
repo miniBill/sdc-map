@@ -1,6 +1,0 @@
-{
-  "devDependencies": {
-    "elm-codegen": "^0.3.0",
-    "elm-watch": "^1.1.2"
-  }
-}

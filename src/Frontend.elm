@@ -1,5 +1,6 @@
 module Frontend exposing (app)
 
+import AppUrl exposing (AppUrl)
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation
 import Dict
@@ -61,25 +62,61 @@ updateFromBackend msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        TFAdmin submissions ->
+            ( AdminLoaded submissions, Cmd.none )
+
 
 init : Lamdera.Url -> Browser.Navigation.Key -> ( FrontendModel, Cmd FrontendMsg )
-init _ _ =
-    ( Filling
-        { name = ""
-        , country = ""
-        , location = ""
-        , nameOnMap = Nothing
-        , captcha = ""
-        , id = ""
-        }
-        Nothing
-    , Cmd.none
-    )
+init url _ =
+    let
+        appUrl : AppUrl
+        appUrl =
+            AppUrl.fromUrl url
+
+        defaultModel : FrontendModel
+        defaultModel =
+            Filling
+                { name = ""
+                , country = ""
+                , location = ""
+                , nameOnMap = Nothing
+                , captcha = ""
+                , id = ""
+                }
+                Nothing
+    in
+    case Dict.get "key" appUrl.queryParameters of
+        Just [ key ] ->
+            ( defaultModel
+            , Lamdera.sendToBackend <| TBAdmin key
+            )
+
+        _ ->
+            ( defaultModel
+            , Cmd.none
+            )
 
 
 view : FrontendModel -> Element FrontendMsg
 view model =
     case model of
+        AdminLoading ->
+            text "Loading..."
+
+        AdminLoaded dict ->
+            let
+                quote : String -> String
+                quote x =
+                    "\"" ++ x ++ "\""
+            in
+            dict
+                |> Dict.toList
+                |> List.map (\( k, EncryptedString v ) -> quote k ++ ":" ++ quote v)
+                |> String.join ","
+                |> (\r -> text <| "{" ++ r ++ "}")
+                |> List.singleton
+                |> paragraph []
+
         Filling input maybeError ->
             Theme.column
                 [ Theme.padding

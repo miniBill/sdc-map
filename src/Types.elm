@@ -12,10 +12,12 @@ type alias BackendModel =
 
 type ToBackend
     = TBSubmit EncryptedString
+    | TBAdmin String
 
 
 type ToFrontend
     = TFSubmitted { id : String }
+    | TFAdmin (Dict String EncryptedString)
 
 
 type FrontendModel
@@ -23,6 +25,8 @@ type FrontendModel
     | Encrypting Input
     | Submitting Input
     | Submitted { id : String, input : Input }
+    | AdminLoading
+    | AdminLoaded (Dict String EncryptedString)
 
 
 type alias Input =

@@ -2,6 +2,7 @@ module Types exposing (BackendModel, BackendMsg, EncryptedString(..), Error, Fro
 
 import Dict exposing (Dict)
 import Random
+import Set exposing (Set)
 
 
 type alias BackendModel =
@@ -26,7 +27,7 @@ type FrontendModel
     | Submitting Input
     | Submitted { id : String, input : Input }
     | AdminDecrypting String (Dict String EncryptedString)
-    | AdminDecrypted (List Input)
+    | AdminDecrypted (Set String) (List Input)
 
 
 type alias Input =
@@ -56,6 +57,7 @@ type FrontendMsg
     | AdminSecretKey String
     | Decrypt
     | Decrypted (List String)
+    | CaptchaIsValid String Bool
       -- Nop
     | Nop
 

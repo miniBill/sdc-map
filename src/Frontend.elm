@@ -5,7 +5,7 @@ import Browser exposing (Document, UrlRequest)
 import Browser.Navigation
 import Codec exposing (Codec)
 import Dict
-import Element exposing (Column, Element, centerX, el, fill, height, paddingEach, paragraph, shrink, text, width)
+import Element exposing (Column, Element, alignTop, centerX, centerY, el, fill, height, paddingEach, paragraph, shrink, text, width)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -16,6 +16,7 @@ import Html.Attributes
 import Lamdera exposing (Url)
 import List.Extra
 import PkgPorts
+import Set exposing (Set)
 import Subdivisions
 import Theme
 import Types exposing (EncryptedString(..), FrontendModel(..), FrontendMsg(..), Input, ToBackend(..), ToFrontend(..))
@@ -125,8 +126,8 @@ view model =
                     }
                 ]
 
-        AdminDecrypted inputs ->
-            viewStatistics inputs
+        AdminDecrypted captchas inputs ->
+            viewStatistics captchas inputs
 
         Filling input maybeError ->
             Theme.column
@@ -186,79 +187,106 @@ view model =
                 ]
 
 
-viewStatistics : List Input -> Element FrontendMsg
-viewStatistics inputs =
+viewStatistics : Set String -> List Input -> Element FrontendMsg
+viewStatistics invalidCaptchas inputs =
     let
+        validInputs : List Input
+        validInputs =
+            inputs
+                |> List.filter (\{ captcha } -> not (Set.member captcha invalidCaptchas))
+
         column : String -> (element -> String) -> Column element msg
         column header toCell =
             { header = el [ Font.bold ] <| text header
-            , view = \row -> text (toCell row)
+            , view = \row -> el [ centerY ] <| text (toCell row)
             , width = shrink
             }
     in
-    Theme.column [ width fill ]
+    Theme.row [ width fill ]
         [ Theme.column
-            [ Border.width 1
-            , Theme.padding
-            , width fill
+            [ width fill
+            , alignTop
             ]
-            [ el [ Font.bold ] <| text "On map"
-            , Element.table [ Theme.spacing ]
-                { data =
-                    inputs
-                        |> List.filter (\{ nameOnMap } -> nameOnMap == Just True)
-                , columns =
-                    [ column "Name" .name
-                    , column "Country" .country
-                    , column "Location" .location
-                    ]
-                }
+            [ Theme.column
+                [ Border.width 1
+                , Theme.padding
+                , width fill
+                ]
+                [ el [ Font.bold ] <| text "On map"
+                , Element.table [ Theme.spacing ]
+                    { data =
+                        validInputs
+                            |> List.filter (\{ nameOnMap } -> nameOnMap == Just True)
+                    , columns =
+                        [ column "Name" .name
+                        , column "Country" .country
+                        , column "Location" .location
+                        ]
+                    }
+                ]
+            , Theme.column
+                [ Border.width 1
+                , Theme.padding
+                , width fill
+                ]
+                [ el [ Font.bold ] <| text "Statistics by country"
+                , Element.table [ Theme.spacing ]
+                    { data =
+                        validInputs
+                            |> List.Extra.gatherEqualsBy (\{ country } -> country)
+                            |> List.map
+                                (\( { country }, rest ) ->
+                                    { country = country
+                                    , count = List.length rest + 1
+                                    }
+                                )
+                            |> List.sortBy (\{ count } -> -count)
+                    , columns =
+                        [ column "Country" .country
+                        , column "Count" <| \{ count } -> String.fromInt count
+                        ]
+                    }
+                ]
             ]
         , Theme.column
             [ Border.width 1
             , Theme.padding
-            , width fill
+            , alignTop
             ]
-            [ el [ Font.bold ] <| text "Statistics by country"
+            [ el [ Font.bold ] <| text "Captchas"
             , Element.table [ Theme.spacing ]
                 { data =
                     inputs
-                        |> List.Extra.gatherEqualsBy (\{ country } -> country)
+                        |> List.Extra.gatherEqualsBy (\{ captcha } -> captcha)
                         |> List.map
-                            (\( { country }, rest ) ->
-                                { country = country
+                            (\( { captcha }, rest ) ->
+                                { captcha = captcha
                                 , count = List.length rest + 1
                                 }
                             )
                         |> List.sortBy (\{ count } -> -count)
                 , columns =
-                    [ column "Country" .country
+                    [ column "Captcha" .captcha
                     , column "Count" <| \{ count } -> String.fromInt count
-                    ]
-                }
-            ]
-        , Theme.column
-            [ Border.width 1
-            , Theme.padding
-            , width fill
-            ]
-            [ el [ Font.bold ] <| text "Statistics by location"
-            , Element.table [ Theme.spacing ]
-                { data =
-                    inputs
-                        |> List.Extra.gatherEqualsBy (\{ country, location } -> ( country, location ))
-                        |> List.map
-                            (\( { country, location }, rest ) ->
-                                { country = country
-                                , location = location
-                                , count = List.length rest + 1
-                                }
-                            )
-                        |> List.sortBy (\{ count } -> -count)
-                , columns =
-                    [ column "Country" .country
-                    , column "Location" .location
-                    , column "Count" <| \{ count } -> String.fromInt count
+                    , { header = el [ Font.bold ] <| text "Is valid"
+                      , view =
+                            \row ->
+                                let
+                                    invalid : Bool
+                                    invalid =
+                                        Set.member row.captcha invalidCaptchas
+                                in
+                                Theme.button []
+                                    { onPress = Just <| CaptchaIsValid row.captcha invalid
+                                    , label =
+                                        if invalid then
+                                            text "No"
+
+                                        else
+                                            text "Yes"
+                                    }
+                      , width = shrink
+                      }
                     ]
                 }
             ]
@@ -460,7 +488,16 @@ update msg model =
         ( Decrypted inputs, _ ) ->
             ( inputs
                 |> List.filterMap decodeInput
-                |> AdminDecrypted
+                |> AdminDecrypted Set.empty
+            , Cmd.none
+            )
+
+        ( CaptchaIsValid captcha valid, AdminDecrypted invalidCaptchas inputs ) ->
+            ( if valid then
+                AdminDecrypted (Set.remove captcha invalidCaptchas) inputs
+
+              else
+                AdminDecrypted (Set.insert captcha invalidCaptchas) inputs
             , Cmd.none
             )
 

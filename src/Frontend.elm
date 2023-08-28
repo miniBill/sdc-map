@@ -16,9 +16,7 @@ import Html.Attributes
 import Lamdera exposing (Url)
 import List.Extra
 import PkgPorts
-import RPC
 import Subdivisions
-import Task
 import Theme
 import Types exposing (EncryptedString(..), FrontendModel(..), FrontendMsg(..), Input, ToBackend(..), ToFrontend(..))
 
@@ -66,6 +64,9 @@ updateFromBackend msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        TFAdmin dict ->
+            ( AdminDecrypting "" dict, Cmd.none )
+
 
 init : Lamdera.Url -> Browser.Navigation.Key -> ( FrontendModel, Cmd FrontendMsg )
 init url _ =
@@ -89,8 +90,7 @@ init url _ =
     case Dict.get "key" appUrl.queryParameters of
         Just [ key ] ->
             ( defaultModel
-            , RPC.requestDump key
-                |> Task.attempt Dumped
+            , Lamdera.sendToBackend <| TBAdmin key
             )
 
         _ ->
@@ -437,9 +437,6 @@ update msg model =
             ( Submitting input
             , Lamdera.sendToBackend <| TBSubmit encryptedString
             )
-
-        ( Dumped (Ok dict), _ ) ->
-            ( AdminDecrypting "" dict, Cmd.none )
 
         ( AdminSecretKey key, AdminDecrypting _ dict ) ->
             ( AdminDecrypting key dict, Cmd.none )

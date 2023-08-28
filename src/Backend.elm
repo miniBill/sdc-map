@@ -56,6 +56,13 @@ updateFromFrontend _ clientId msg model =
             , Lamdera.sendToFrontend clientId <| TFSubmitted { id = id }
             )
 
+        TBAdmin key ->
+            if key == Env.key then
+                ( model, Lamdera.sendToFrontend clientId <| TFAdmin model.submissions )
+
+            else
+                ( model, Cmd.none )
+
 
 idGenerator : Random.Generator String
 idGenerator =

@@ -1,4 +1,4 @@
-module Types exposing (BackendModel, BackendMsg(..), EncryptedString(..), Error, FrontendModel(..), FrontendMsg(..), Input, ToBackend(..), ToFrontend(..))
+module Types exposing (BackendModel, BackendMsg, EncryptedString(..), Error, FrontendModel(..), FrontendMsg(..), Input, ToBackend(..), ToFrontend(..))
 
 import Dict exposing (Dict)
 import Http
@@ -58,5 +58,5 @@ type EncryptedString
     = EncryptedString String
 
 
-type BackendMsg
-    = BackendNop
+type alias BackendMsg =
+    {}

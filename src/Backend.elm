@@ -4,7 +4,7 @@ import Dict
 import Env
 import Lamdera
 import Random
-import Types exposing (BackendModel, BackendMsg(..), ToBackend(..), ToFrontend(..))
+import Types exposing (BackendModel, BackendMsg, ToBackend(..), ToFrontend(..))
 
 
 app :
@@ -37,10 +37,8 @@ subscriptions _ =
 
 
 update : BackendMsg -> BackendModel -> ( BackendModel, Cmd BackendMsg )
-update msg model =
-    case msg of
-        BackendNop ->
-            ( model, Cmd.none )
+update _ model =
+    ( model, Cmd.none )
 
 
 updateFromFrontend : Lamdera.SessionId -> Lamdera.ClientId -> ToBackend -> BackendModel -> ( BackendModel, Cmd BackendMsg )

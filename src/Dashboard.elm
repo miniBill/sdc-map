@@ -1,6 +1,6 @@
 module Dashboard exposing (view)
 
-import Element exposing (Column, Element, alignTop, centerY, el, fill, shrink, text, width)
+import Element exposing (Column, Element, alignTop, centerY, el, fill, px, shrink, text, width)
 import Element.Border as Border
 import Element.Font as Font
 import List.Extra
@@ -128,4 +128,5 @@ card label { data, columns, pie } =
                     |> List.sortBy (\( _, count ) -> count)
                     |> Pie.view
                     |> Element.html
+                    |> el [ width <| px 500 ]
         ]

@@ -2841,9 +2841,13 @@ const randomBytes = defined.randomBytes;
 // Written by Leonardo Taglialegne
 
 function stringToByteArray(s) {
-  if (typeof s !== "string") throw new TypeError("expected string");
-  var enc = new TextEncoder(); // always utf-8
+  var enc = new TextEncoder();
   return enc.encode(s);
+}
+
+function byteArrayToString(s) {
+  var dec = new TextDecoder();
+  return dec.decode(s);
 }
 
 /**
@@ -2869,7 +2873,6 @@ function bytesToBase64(bytes) {
 // Written by Leonardo Taglialegne
 
 const userPair = box.keyPair();
-const serverPair = box.keyPair();
 
 function encrypt(input, publicKey, secretKey) {
   const nonce = randomBytes(box.nonceLength);
@@ -2877,19 +2880,58 @@ function encrypt(input, publicKey, secretKey) {
   const encrypted = box(messageUint8, nonce, publicKey, secretKey);
 
   const fullMessage = new Uint8Array(
-    nonce.length + encrypted.length + userPair.publicKey.length
+    box.nonceLength + box.publicKeyLength + encrypted.length
   );
   fullMessage.set(nonce);
-  fullMessage.set(userPair.publicKey, nonce.length);
-  fullMessage.set(encrypted, nonce.length + userPair.publicKey.length);
+  fullMessage.set(userPair.publicKey, box.nonceLength);
+  fullMessage.set(encrypted, box.nonceLength + box.publicKeyLength);
 
   return bytesToBase64(fullMessage);
 }
 
+function decrypt(messageWithNonce, secretKey) {
+  const messageWithNonceAsUint8Array = base64ToBytes(messageWithNonce);
+  const nonce = messageWithNonceAsUint8Array.slice(0, box.nonceLength);
+  const publicKey = messageWithNonceAsUint8Array.slice(
+    box.nonceLength,
+    box.publicKeyLength
+  );
+  const message = messageWithNonceAsUint8Array.slice(
+    box.nonceLength + box.publicKeyLength,
+    messageWithNonce.length
+  );
+
+  const decrypted = box.open(
+    message,
+    nonce,
+    publicKey,
+    base64ToBytes(secretKey)
+  );
+
+  if (!decrypted) {
+    throw new Error("Could not decrypt message");
+  }
+
+  return byteArrayToString(decrypted);
+}
+
 exports.init = function (app) {
-  app.ports.encrypt.subscribe(function (input) {
+  app.ports.encrypt.subscribe(function (input, serverPublic) {
     app.ports.encrypted.send(
-      encrypt(input, serverPair.publicKey, userPair.secretKey)
+      encrypt(input, base64ToBytes(serverPublic), userPair.secretKey)
     );
+  });
+
+  app.ports.decrypt.subscribe(function ({ inputs, serverSecret }) {
+    var result = [];
+    inputs.forEach((input) => {
+      try {
+        result.push(decrypt(input, serverSecret));
+      } catch (e) {
+        console.error(e);
+      }
+    });
+    result.sort();
+    app.ports.decrypted.send(result);
   });
 };

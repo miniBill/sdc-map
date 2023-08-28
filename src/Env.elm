@@ -1,4 +1,4 @@
-module Env exposing (key, seed)
+module Env exposing (key, seed, serverPublicKey)
 
 
 seed : Int
@@ -9,3 +9,8 @@ seed =
 key : String
 key =
     "abcd"
+
+
+serverPublicKey : String
+serverPublicKey =
+    "9phrQzEmyoflIegvSWynbiVQ+kc3NL45ru64fSAblTo="

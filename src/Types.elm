@@ -1,6 +1,7 @@
 module Types exposing (BackendModel, BackendMsg(..), EncryptedString(..), Error, FrontendModel(..), FrontendMsg(..), Input, ToBackend(..), ToFrontend(..))
 
 import Dict exposing (Dict)
+import Http
 import Random
 
 
@@ -12,12 +13,10 @@ type alias BackendModel =
 
 type ToBackend
     = TBSubmit EncryptedString
-    | TBAdmin String
 
 
 type ToFrontend
     = TFSubmitted { id : String }
-    | TFAdmin (Dict String EncryptedString)
 
 
 type FrontendModel
@@ -25,7 +24,6 @@ type FrontendModel
     | Encrypting Input
     | Submitting Input
     | Submitted { id : String, input : Input }
-    | AdminLoading
     | AdminLoaded (Dict String EncryptedString)
 
 
@@ -52,6 +50,7 @@ type FrontendMsg
     | Captcha String
     | Submit
     | Encrypted EncryptedString
+    | Dumped (Result Http.Error (Dict String EncryptedString))
     | Nop
 
 

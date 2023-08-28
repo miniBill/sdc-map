@@ -46,13 +46,6 @@ update msg model =
 updateFromFrontend : Lamdera.SessionId -> Lamdera.ClientId -> ToBackend -> BackendModel -> ( BackendModel, Cmd BackendMsg )
 updateFromFrontend _ clientId msg model =
     case msg of
-        TBAdmin key ->
-            if key == Env.key then
-                ( model, Lamdera.sendToFrontend clientId <| TFAdmin model.submissions )
-
-            else
-                ( model, Cmd.none )
-
         TBSubmit encrypted ->
             let
                 ( id, newSeed ) =

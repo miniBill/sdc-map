@@ -14,7 +14,9 @@ import Html.Attributes
 import Json.Encode
 import Lamdera exposing (Url)
 import PkgPorts
+import RPC
 import Subdivisions
+import Task
 import Theme
 import Types exposing (EncryptedString(..), FrontendModel(..), FrontendMsg(..), Input, ToBackend(..), ToFrontend(..))
 
@@ -62,9 +64,6 @@ updateFromBackend msg model =
                 _ ->
                     ( model, Cmd.none )
 
-        TFAdmin submissions ->
-            ( AdminLoaded submissions, Cmd.none )
-
 
 init : Lamdera.Url -> Browser.Navigation.Key -> ( FrontendModel, Cmd FrontendMsg )
 init url _ =
@@ -88,7 +87,8 @@ init url _ =
     case Dict.get "key" appUrl.queryParameters of
         Just [ key ] ->
             ( defaultModel
-            , Lamdera.sendToBackend <| TBAdmin key
+            , RPC.requestDump key
+                |> Task.attempt Dumped
             )
 
         _ ->
@@ -100,9 +100,6 @@ init url _ =
 view : FrontendModel -> Element FrontendMsg
 view model =
     case model of
-        AdminLoading ->
-            text "Loading..."
-
         AdminLoaded dict ->
             let
                 quote : String -> String
@@ -351,6 +348,9 @@ update msg model =
             ( Submitting input
             , Lamdera.sendToBackend <| TBSubmit encryptedString
             )
+
+        ( Dumped (Ok dict), _ ) ->
+            ( AdminLoaded dict, Cmd.none )
 
         _ ->
             ( model, Cmd.none )

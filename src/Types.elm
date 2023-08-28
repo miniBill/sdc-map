@@ -24,7 +24,8 @@ type FrontendModel
     | Encrypting Input
     | Submitting Input
     | Submitted { id : String, input : Input }
-    | AdminLoaded (Dict String EncryptedString)
+    | AdminDecrypting String (Dict String EncryptedString)
+    | AdminDecrypted (List Input)
 
 
 type alias Input =
@@ -50,7 +51,12 @@ type FrontendMsg
     | Captcha String
     | Submit
     | Encrypted EncryptedString
+      -- Admin page
     | Dumped (Result Http.Error (Dict String EncryptedString))
+    | AdminSecretKey String
+    | Decrypt
+    | Decrypted (List String)
+      -- Nop
     | Nop
 
 

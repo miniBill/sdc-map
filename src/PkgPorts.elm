@@ -1,4 +1,4 @@
-port module PkgPorts exposing (encrypt, encrypted)
+port module PkgPorts exposing (decrypt, decrypted, encrypt, encrypted)
 
 
 port encrypt : { input : String, serverPublic : String } -> Cmd msg

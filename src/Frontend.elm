@@ -3,15 +3,15 @@ module Frontend exposing (app)
 import AppUrl exposing (AppUrl)
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation
+import Codec exposing (Codec)
 import Dict
 import Element exposing (Element, centerX, el, fill, height, paddingEach, paragraph, shrink, text, width)
 import Element.Background as Background
-import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
+import Env
 import Html
 import Html.Attributes
-import Json.Encode
 import Lamdera exposing (Url)
 import PkgPorts
 import RPC
@@ -100,19 +100,25 @@ init url _ =
 view : FrontendModel -> Element FrontendMsg
 view model =
     case model of
-        AdminLoaded dict ->
-            let
-                quote : String -> String
-                quote x =
-                    "\"" ++ x ++ "\""
-            in
-            dict
-                |> Dict.toList
-                |> List.map (\( k, EncryptedString v ) -> quote k ++ ":" ++ quote v)
-                |> String.join ","
-                |> (\r -> text <| "{" ++ r ++ "}")
-                |> List.singleton
-                |> paragraph []
+        AdminDecrypting key _ ->
+            Theme.column []
+                [ Input.currentPassword []
+                    { onChange = AdminSecretKey
+                    , placeholder = Nothing
+                    , label = Input.labelAbove [] <| text "Secret key"
+                    , show = False
+                    , text = key
+                    }
+                , Theme.button []
+                    { onPress = Just Decrypt
+                    , label = text "Decrypt"
+                    }
+                ]
+
+        AdminDecrypted inputs ->
+            inputs
+                |> List.map viewInputReadonly
+                |> Theme.wrappedRow []
 
         Filling input maybeError ->
             Theme.column
@@ -127,10 +133,7 @@ view model =
                     Nothing ->
                         Element.none
                 , if isValid input then
-                    Input.button
-                        [ Theme.padding
-                        , Border.width 1
-                        ]
+                    Theme.button []
                         { onPress = Just Submit
                         , label = text "Submit"
                         }
@@ -300,6 +303,10 @@ viewInput input =
                     , el [ Font.size 14, Font.color <| Element.rgb 0.4 0.4 0.4 ] <| text description
                     ]
 
+        countries : List String
+        countries =
+            Dict.keys Subdivisions.subdivisions
+
         locations : List String
         locations =
             Dict.get input.country Subdivisions.subdivisions
@@ -307,7 +314,7 @@ viewInput input =
                 |> List.sort
     in
     [ inputRow "name" "Name" "" True Name input.name []
-    , inputRow "country" "Country" "" True Country input.country (Dict.keys Subdivisions.subdivisions)
+    , inputRow "country" "Country" "" True Country input.country countries
     , inputRow "location" "Location" "Where are you from? Pick the name of the region, county, or a big city near you. DON'T provide your address." False Location input.location locations
     , [ yesNoRow "Show name on map" "Should your name be shown on the map, or just used for statistics?" True NameOnMap input.nameOnMap ]
     , inputRow "contact" "Contact" "Some contact (email/twitter/discord/...) you can use to prove it's you if you want to remove your information. Will not be published in any form." False Id input.id []
@@ -341,7 +348,10 @@ update msg model =
 
         ( Submit, Filling input _ ) ->
             ( Encrypting input
-            , PkgPorts.encrypt <| encodeInput input
+            , PkgPorts.encrypt
+                { input = encodeInput input
+                , serverPublic = Env.serverPublicKey
+                }
             )
 
         ( Encrypted encryptedString, Encrypting input ) ->
@@ -350,7 +360,25 @@ update msg model =
             )
 
         ( Dumped (Ok dict), _ ) ->
-            ( AdminLoaded dict, Cmd.none )
+            ( AdminDecrypting "" dict, Cmd.none )
+
+        ( AdminSecretKey key, AdminDecrypting _ dict ) ->
+            ( AdminDecrypting key dict, Cmd.none )
+
+        ( Decrypt, AdminDecrypting key dict ) ->
+            ( model
+            , PkgPorts.decrypt
+                { inputs = List.map (\(EncryptedString e) -> e) (Dict.values dict)
+                , serverSecret = key
+                }
+            )
+
+        ( Decrypted inputs, _ ) ->
+            ( inputs
+                |> List.filterMap decodeInput
+                |> AdminDecrypted
+            , Cmd.none
+            )
 
         _ ->
             ( model, Cmd.none )
@@ -358,20 +386,39 @@ update msg model =
 
 encodeInput : Input -> String
 encodeInput input =
-    [ Just ( "name", Json.Encode.string input.name )
-    , Just ( "country", Json.Encode.string input.country )
-    , Just ( "location", Json.Encode.string input.location )
-    , Maybe.map
-        (\nameOnMap -> ( "name_on_map", Json.Encode.bool nameOnMap ))
-        input.nameOnMap
-    , Just ( "id", Json.Encode.string input.id )
-    , Just ( "captcha", Json.Encode.string input.captcha )
-    ]
-        |> List.filterMap identity
-        |> Json.Encode.object
-        |> Json.Encode.encode 0
+    Codec.encodeToString 0 inputCodec input
+
+
+decodeInput : String -> Maybe Input
+decodeInput input =
+    Codec.decodeString inputCodec input
+        |> Result.toMaybe
+
+
+inputCodec : Codec Input
+inputCodec =
+    Codec.object
+        (\name country location nameOnMap id captcha ->
+            { name = name
+            , country = country
+            , location = location
+            , nameOnMap = nameOnMap
+            , id = id
+            , captcha = captcha
+            }
+        )
+        |> Codec.field "name" .name Codec.string
+        |> Codec.field "country" .country Codec.string
+        |> Codec.field "location" .location Codec.string
+        |> Codec.maybeField "name_on_map" .nameOnMap Codec.bool
+        |> Codec.field "id" .id Codec.string
+        |> Codec.field "captcha" .captcha Codec.string
+        |> Codec.buildObject
 
 
 subscriptions : FrontendModel -> Sub FrontendMsg
 subscriptions _ =
-    PkgPorts.encrypted (\result -> Encrypted <| EncryptedString result)
+    Sub.batch
+        [ PkgPorts.encrypted (\result -> Encrypted <| EncryptedString result)
+        , PkgPorts.decrypted Decrypted
+        ]

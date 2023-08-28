@@ -2894,11 +2894,10 @@ function decrypt(messageWithNonce, secretKey) {
   const nonce = messageWithNonceAsUint8Array.slice(0, box.nonceLength);
   const publicKey = messageWithNonceAsUint8Array.slice(
     box.nonceLength,
-    box.publicKeyLength
+    box.nonceLength + box.publicKeyLength
   );
   const message = messageWithNonceAsUint8Array.slice(
-    box.nonceLength + box.publicKeyLength,
-    messageWithNonce.length
+    box.nonceLength + box.publicKeyLength
   );
 
   const decrypted = box.open(
@@ -2916,7 +2915,7 @@ function decrypt(messageWithNonce, secretKey) {
 }
 
 exports.init = function (app) {
-  app.ports.encrypt.subscribe(function (input, serverPublic) {
+  app.ports.encrypt.subscribe(function ({ input, serverPublic }) {
     app.ports.encrypted.send(
       encrypt(input, base64ToBytes(serverPublic), userPair.secretKey)
     );

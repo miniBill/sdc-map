@@ -71,7 +71,7 @@ view model =
             List.range 0 (length - 1)
                 |> List.map
                     (\i ->
-                        Color.Oklch.oklch 0.8 0.1 (toFloat i / toFloat length)
+                        Color.Oklch.oklch 0.7 0.1 (toFloat i / toFloat length)
                             |> Color.Oklch.toColor
                     )
                 |> Array.fromList

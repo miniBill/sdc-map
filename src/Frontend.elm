@@ -5,14 +5,16 @@ import Browser exposing (Document, UrlRequest)
 import Browser.Navigation
 import Codec exposing (Codec)
 import Dict
-import Element exposing (Element, centerX, el, fill, height, paddingEach, paragraph, shrink, text, width)
+import Element exposing (Column, Element, centerX, el, fill, height, paddingEach, paragraph, shrink, text, width)
 import Element.Background as Background
+import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
 import Env
 import Html
 import Html.Attributes
 import Lamdera exposing (Url)
+import List.Extra
 import PkgPorts
 import RPC
 import Subdivisions
@@ -116,9 +118,7 @@ view model =
                 ]
 
         AdminDecrypted inputs ->
-            inputs
-                |> List.map viewInputReadonly
-                |> Theme.wrappedRow []
+            viewStatistics inputs
 
         Filling input maybeError ->
             Theme.column
@@ -176,6 +176,85 @@ view model =
                             ++ id
                     ]
                 ]
+
+
+viewStatistics : List Input -> Element FrontendMsg
+viewStatistics inputs =
+    let
+        column : String -> (element -> String) -> Column element msg
+        column header toCell =
+            { header = el [ Font.bold ] <| text header
+            , view = \row -> text (toCell row)
+            , width = shrink
+            }
+    in
+    Theme.column [ width fill ]
+        [ Theme.column
+            [ Border.width 1
+            , Theme.padding
+            , width fill
+            ]
+            [ el [ Font.bold ] <| text "On map"
+            , Element.table [ Theme.spacing ]
+                { data =
+                    inputs
+                        |> List.filter (\{ nameOnMap } -> nameOnMap == Just True)
+                , columns =
+                    [ column "Name" .name
+                    , column "Country" .country
+                    , column "Location" .location
+                    ]
+                }
+            ]
+        , Theme.column
+            [ Border.width 1
+            , Theme.padding
+            , width fill
+            ]
+            [ el [ Font.bold ] <| text "Statistics by country"
+            , Element.table [ Theme.spacing ]
+                { data =
+                    inputs
+                        |> List.Extra.gatherEqualsBy (\{ country } -> country)
+                        |> List.map
+                            (\( { country }, rest ) ->
+                                { country = country
+                                , count = List.length rest + 1
+                                }
+                            )
+                        |> List.sortBy (\{ count } -> -count)
+                , columns =
+                    [ column "Country" .country
+                    , column "Count" <| \{ count } -> String.fromInt count
+                    ]
+                }
+            ]
+        , Theme.column
+            [ Border.width 1
+            , Theme.padding
+            , width fill
+            ]
+            [ el [ Font.bold ] <| text "Statistics by location"
+            , Element.table [ Theme.spacing ]
+                { data =
+                    inputs
+                        |> List.Extra.gatherEqualsBy (\{ country, location } -> ( country, location ))
+                        |> List.map
+                            (\( { country, location }, rest ) ->
+                                { country = country
+                                , location = location
+                                , count = List.length rest + 1
+                                }
+                            )
+                        |> List.sortBy (\{ count } -> -count)
+                , columns =
+                    [ column "Country" .country
+                    , column "Location" .location
+                    , column "Count" <| \{ count } -> String.fromInt count
+                    ]
+                }
+            ]
+        ]
 
 
 isValid : Input -> Bool

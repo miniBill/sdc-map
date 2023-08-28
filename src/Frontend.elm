@@ -6,7 +6,7 @@ import Browser.Navigation
 import Codec exposing (Codec)
 import Dashboard
 import Dict
-import Element exposing (Element, centerX, el, fill, height, paddingEach, paragraph, shrink, text, width)
+import Element exposing (Element, centerX, el, fill, height, paddingEach, paragraph, rgb255, shrink, text, width)
 import Element.Background as Background
 import Element.Font as Font
 import Element.Input as Input
@@ -41,6 +41,8 @@ app =
                         [ width fill
                         , height fill
                         , Theme.padding
+                        , Background.color <| rgb255 0xC0 0xBD 0xB6
+                        , Font.color <| rgb255 0x27 0x28 0x1A
                         ]
                         (view flagsModel)
                     ]
@@ -249,16 +251,18 @@ viewInput input =
         inputRow : String -> String -> String -> Bool -> (String -> FrontendMsg) -> String -> List String -> List (Element FrontendMsg)
         inputRow autocomplete label description mandatory toMsg value autocompleteList =
             [ Input.text
-                ([ Html.Attributes.autocomplete True
-                 , Html.Attributes.name autocomplete
-                 , Html.Attributes.id autocomplete
-                 , if List.isEmpty autocompleteList then
-                    Html.Attributes.classList []
+                (([ Html.Attributes.autocomplete True
+                  , Html.Attributes.name autocomplete
+                  , Html.Attributes.id autocomplete
+                  , if List.isEmpty autocompleteList then
+                        Html.Attributes.classList []
 
-                   else
-                    Html.Attributes.list (autocomplete ++ "-list")
-                 ]
+                    else
+                        Html.Attributes.list (autocomplete ++ "-list")
+                  ]
                     |> List.map Element.htmlAttribute
+                 )
+                    ++ [ Background.color <| rgb255 0xE7 0xE8 0xED ]
                 )
                 { label = toLabel label description mandatory
                 , text = value

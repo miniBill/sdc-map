@@ -1,7 +1,6 @@
 module Types exposing (BackendModel, BackendMsg, EncryptedString(..), Error, FrontendModel(..), FrontendMsg(..), Input, ToBackend(..), ToFrontend(..))
 
 import Dict exposing (Dict)
-import Http
 import Random
 
 

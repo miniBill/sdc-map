@@ -56,4 +56,7 @@ config =
     , NoUnused.Variables.rule
     , Simplify.rule Simplify.defaults
     ]
-        |> List.map (Rule.ignoreErrorsForFiles [ "src/LamderaRPC.elm" ])
+        |> List.map
+            (Rule.ignoreErrorsForFiles [ "src/LamderaRPC.elm" ]
+                >> Rule.ignoreErrorsForDirectories [ "src/Evergreen" ]
+            )

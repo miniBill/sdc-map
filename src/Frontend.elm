@@ -414,6 +414,7 @@ decodeInput string =
                         input.country
                             |> String.replace "United Kingdom of Great Britain and Northern Ireland" "UK"
                             |> String.replace "United States of America" "USA"
+                    , captcha = String.toLower input.captcha
                 }
             )
 

@@ -5162,7 +5162,7 @@ subdivisions =
             , "Umm al Qaywayn"
             ]
           )
-        , ( "United Kingdom of Great Britain and Northern Ireland"
+        , ( "UK"
           , [ "Armagh City, Banbridge and Craigavon"
             , "Aberdeenshire"
             , "Aberdeen City"
@@ -5397,7 +5397,7 @@ subdivisions =
             , "Palmyra Atoll"
             ]
           )
-        , ( "United States of America"
+        , ( "USA"
           , [ "Alaska"
             , "Alabama"
             , "Arkansas"

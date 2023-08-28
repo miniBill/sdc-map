@@ -19,7 +19,11 @@ file =
         |> List.map
             (\{ name, subdivisions } ->
                 Elm.tuple
-                    (Elm.string name)
+                    (name
+                        |> String.replace "United Kingdom of Great Britain and Northern Ireland" "UK"
+                        |> String.replace "United States of America" "USA"
+                        |> Elm.string
+                    )
                     (Elm.list <| List.map (Elm.string << .name) subdivisions)
             )
         |> Gen.Dict.fromList

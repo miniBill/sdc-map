@@ -404,9 +404,18 @@ encodeInput input =
 
 
 decodeInput : String -> Maybe Input
-decodeInput input =
-    Codec.decodeString inputCodec input
+decodeInput string =
+    Codec.decodeString inputCodec string
         |> Result.toMaybe
+        |> Maybe.map
+            (\input ->
+                { input
+                    | country =
+                        input.country
+                            |> String.replace "United Kingdom of Great Britain and Northern Ireland" "UK"
+                            |> String.replace "United States of America" "USA"
+                }
+            )
 
 
 inputCodec : Codec Input

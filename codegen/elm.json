@@ -2,7 +2,7 @@
     "type": "application",
     "source-directories": [
         ".",
-        "../../countries-elm/src"
+        "../../elm-countries/src"
     ],
     "elm-version": "0.19.1",
     "dependencies": {

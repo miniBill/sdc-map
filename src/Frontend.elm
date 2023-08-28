@@ -69,7 +69,7 @@ updateFromBackend msg model =
 
 
 init : Lamdera.Url -> Browser.Navigation.Key -> ( FrontendModel, Cmd FrontendMsg )
-init url _ =
+init url navKey =
     let
         appUrl : AppUrl
         appUrl =
@@ -90,7 +90,15 @@ init url _ =
     case Dict.get "key" appUrl.queryParameters of
         Just [ key ] ->
             ( defaultModel
-            , Lamdera.sendToBackend <| TBAdmin key
+            , Cmd.batch
+                [ Lamdera.sendToBackend <| TBAdmin key
+                , case Env.mode of
+                    Env.Production ->
+                        Browser.Navigation.replaceUrl navKey "/admin"
+
+                    Env.Development ->
+                        Cmd.none
+                ]
             )
 
         _ ->

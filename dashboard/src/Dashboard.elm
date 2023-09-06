@@ -5,8 +5,11 @@ import Element exposing (Column, Element, alignTop, centerY, el, fill, px, row, 
 import Element.Border as Border
 import Element.Font as Font
 import GeoJson exposing (GeoJson)
+import Http
+import Json.Decode exposing (Decoder)
 import List.Extra
 import Pie
+import RemoteData exposing (WebData)
 import Set exposing (Set)
 import Theme
 import Types exposing (Input)
@@ -14,13 +17,56 @@ import Types exposing (Input)
 
 type Msg
     = InvalidCaptchas (Set String)
+    | GotIndexData (Result Http.Error (Dict String { threeLetterCode : String, level : Int }))
 
 
 type alias Model =
     { invalidCaptchas : Set String
     , inputs : List Input
+    , indexData : WebData (Dict String { threeLetterCode : String, level : Int })
     , loadedGeoJsonData : Dict Country GeoJson
     }
+
+
+init : List Input -> ( Model, Cmd Msg )
+init inputs =
+    ( { inputs = inputs
+      , invalidCaptchas = Set.empty
+      , loadedGeoJsonData = Dict.empty
+      , indexData = RemoteData.Loading
+      }
+    , Http.get
+        { url = "/geodata-index.json"
+        , expect = Http.expectJson GotIndexData indexDataDecoder
+        }
+    )
+
+
+indexDataDecoder : Decoder (Dict String { threeLetterCode : String, level : Int })
+indexDataDecoder =
+    let
+        elementDecoder : String -> Decoder { threeLetterCode : String, level : Int }
+        elementDecoder rawString =
+            case String.split "_" rawString of
+                [ threeLetterCode, _, levelString ] ->
+                    case String.toInt levelString of
+                        Nothing ->
+                            Json.Decode.fail <| "Could not parse '" ++ levelString ++ "' as an integer"
+
+                        Just level ->
+                            Json.Decode.succeed
+                                { threeLetterCode = threeLetterCode
+                                , level = level
+                                }
+
+                _ ->
+                    Json.Decode.fail <| "Could not split '" ++ rawString ++ "' in three parts"
+    in
+    Json.Decode.dict
+        (Json.Decode.andThen
+            elementDecoder
+            Json.Decode.string
+        )
 
 
 type alias Country =
@@ -29,15 +75,13 @@ type alias Country =
 
 view : Model -> Element Msg
 view model =
-    row [ Theme.spacing, width fill ]
-        [ Theme.column
-            [ width fill
-            , alignTop
+    Theme.column []
+        [ row
+            [ Theme.spacing, width fill ]
+            [ viewByCountry model
+            , viewCaptchas model
             ]
-            [ viewOnMap model
-            , viewByCountry model
-            ]
-        , viewCaptchas model
+        , viewOnMap model
         ]
 
 
@@ -171,18 +215,11 @@ card label { data, columns, pie } =
         ]
 
 
-init : List Input -> ( Model, Cmd msg )
-init inputs =
-    ( { inputs = inputs
-      , invalidCaptchas = Set.empty
-      , loadedGeoJsonData = Dict.empty
-      }
-    , Cmd.none
-    )
-
-
 update : Msg -> Model -> ( Model, Cmd msg )
 update msg model =
     case msg of
         InvalidCaptchas invalidCaptchas ->
             ( { model | invalidCaptchas = invalidCaptchas }, Cmd.none )
+
+        GotIndexData result ->
+            ( { model | indexData = RemoteData.fromResult result }, Cmd.none )

@@ -93,26 +93,29 @@ validInputs model =
 
 viewOnMap : Model -> Element Msg
 viewOnMap model =
-    card "On map"
-        { data =
-            validInputs model
-                |> List.filter
-                    (\{ nameOnMap } ->
-                        (nameOnMap == Just True)
-                    )
-        , columns =
-            [ tableColumn "Name" .name
-            , tableColumn "Country" .country
-            , tableColumn "Location" .location
+    Theme.column []
+        [ card "On map"
+            [ Element.table [ Theme.spacing ]
+                { data =
+                    validInputs model
+                        |> List.filter
+                            (\{ nameOnMap } ->
+                                (nameOnMap == Just True)
+                            )
+                , columns =
+                    [ tableColumn "Name" .name
+                    , tableColumn "Country" .country
+                    , tableColumn "Location" .location
+                    ]
+                }
             ]
-        , pie = Nothing
-        }
+        ]
 
 
 viewByCountry : Model -> Element Msg
 viewByCountry model =
-    card "Statistics by country"
-        { data =
+    let
+        data =
             model
                 |> validInputs
                 |> List.Extra.gatherEqualsBy (\{ country } -> country)
@@ -123,12 +126,22 @@ viewByCountry model =
                         }
                     )
                 |> List.sortBy (\{ count } -> -count)
-        , columns =
-            [ tableColumn "Country" .country
-            , tableColumn "Count" <| \{ count } -> String.fromInt count
-            ]
-        , pie = Just <| \{ country, count } -> ( country, toFloat count )
-        }
+    in
+    card "Statistics by country"
+        [ Element.table [ Theme.spacing ]
+            { data =
+                data
+            , columns =
+                [ tableColumn "Country" .country
+                , tableColumn "Count" <| \{ count } -> String.fromInt count
+                ]
+            }
+        , data
+            |> List.map (\{ country, count } -> ( country, toFloat count ))
+            |> Pie.view
+            |> Element.html
+            |> el [ width <| px 500 ]
+        ]
 
 
 tableColumn : String -> (element -> String) -> Column element msg
@@ -142,77 +155,60 @@ tableColumn header toCell =
 viewCaptchas : Model -> Element Msg
 viewCaptchas { invalidCaptchas, inputs } =
     card "Captchas"
-        { data =
-            inputs
-                |> List.Extra.gatherEqualsBy (\{ captcha } -> String.toLower captcha)
-                |> List.map
-                    (\( { captcha }, rest ) ->
-                        { captcha = String.toLower captcha
-                        , count = List.length rest + 1
-                        }
-                    )
-                |> List.sortBy (\{ count } -> -count)
-        , columns =
-            [ tableColumn "Captcha" .captcha
-            , tableColumn "Count" <| \{ count } -> String.fromInt count
-            , { header = el [ Font.bold ] <| text "Is valid"
-              , view =
-                    \{ captcha } ->
-                        let
-                            ( label, updater ) =
-                                if Set.member captcha invalidCaptchas then
-                                    ( "No", Set.remove )
-
-                                else
-                                    ( "Yes", Set.insert )
-                        in
-                        Theme.button []
-                            { onPress =
-                                invalidCaptchas
-                                    |> updater captcha
-                                    |> InvalidCaptchas
-                                    |> Just
-                            , label = text label
+        [ Element.table [ Theme.spacing ]
+            { data =
+                inputs
+                    |> List.Extra.gatherEqualsBy (\{ captcha } -> String.toLower captcha)
+                    |> List.map
+                        (\( { captcha }, rest ) ->
+                            { captcha = String.toLower captcha
+                            , count = List.length rest + 1
                             }
-              , width = shrink
-              }
-            ]
-        , pie = Nothing
-        }
+                        )
+                    |> List.sortBy (\{ count } -> -count)
+            , columns =
+                [ tableColumn "Captcha" .captcha
+                , tableColumn "Count" <| \{ count } -> String.fromInt count
+                , { header = el [ Font.bold ] <| text "Is valid"
+                  , view =
+                        \{ captcha } ->
+                            let
+                                ( label, updater ) =
+                                    if Set.member captcha invalidCaptchas then
+                                        ( "No", Set.remove )
+
+                                    else
+                                        ( "Yes", Set.insert )
+                            in
+                            Theme.button []
+                                { onPress =
+                                    invalidCaptchas
+                                        |> updater captcha
+                                        |> InvalidCaptchas
+                                        |> Just
+                                , label = text label
+                                }
+                  , width = shrink
+                  }
+                ]
+            }
+        ]
 
 
 card :
     String
-    ->
-        { data : List record
-        , columns : List (Column record msg)
-        , pie : Maybe (record -> ( String, Float ))
-        }
+    -> List (Element msg)
     -> Element msg
-card label { data, columns, pie } =
+card label children =
     Theme.column
         [ Border.width 1
         , Theme.padding
         , width fill
         , alignTop
         ]
-        [ el [ Font.bold ] <| text label
-        , Element.table [ Theme.spacing ]
-            { data = data
-            , columns = columns
-            }
-        , case pie of
-            Nothing ->
-                Element.none
-
-            Just f ->
-                data
-                    |> List.map f
-                    |> List.sortBy (\( _, count ) -> count)
-                    |> Pie.view
-                    |> Element.html
-                    |> el [ width <| px 500 ]
-        ]
+        (el [ Font.bold ] (text label)
+            :: children
+        )
 
 
 update : Msg -> Model -> ( Model, Cmd msg )

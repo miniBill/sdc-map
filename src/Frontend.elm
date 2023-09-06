@@ -134,6 +134,7 @@ view model =
                 |> Flate.deflate
                 |> Base64.fromBytes
                 |> Maybe.withDefault "<failed>"
+                |> (\s -> String.fromInt (List.length inputs) ++ " : " ++ s)
                 |> text
                 |> List.singleton
                 |> paragraph []

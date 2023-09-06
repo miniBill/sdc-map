@@ -1,8 +1,10 @@
 module Dashboard exposing (Model, Msg, init, update, view)
 
+import Dict exposing (Dict)
 import Element exposing (Column, Element, alignTop, centerY, el, fill, px, row, shrink, text, width)
 import Element.Border as Border
 import Element.Font as Font
+import GeoJson exposing (GeoJson)
 import List.Extra
 import Pie
 import Set exposing (Set)
@@ -10,14 +12,19 @@ import Theme
 import Types exposing (Input)
 
 
-type alias Msg =
-    Model
+type Msg
+    = InvalidCaptchas (Set String)
 
 
 type alias Model =
     { invalidCaptchas : Set String
     , inputs : List Input
+    , loadedGeoJsonData : Dict Country GeoJson
     }
+
+
+type alias Country =
+    String
 
 
 view : Model -> Element Msg
@@ -89,7 +96,7 @@ tableColumn header toCell =
 
 
 viewCaptchas : Model -> Element Msg
-viewCaptchas ({ invalidCaptchas, inputs } as model) =
+viewCaptchas { invalidCaptchas, inputs } =
     card "Captchas"
         { data =
             inputs
@@ -116,7 +123,11 @@ viewCaptchas ({ invalidCaptchas, inputs } as model) =
                                     ( "Yes", Set.insert )
                         in
                         Theme.button []
-                            { onPress = Just { model | invalidCaptchas = updater captcha invalidCaptchas }
+                            { onPress =
+                                invalidCaptchas
+                                    |> updater captcha
+                                    |> InvalidCaptchas
+                                    |> Just
                             , label = text label
                             }
               , width = shrink
@@ -160,13 +171,18 @@ card label { data, columns, pie } =
         ]
 
 
-init : List Input -> Model
+init : List Input -> ( Model, Cmd msg )
 init inputs =
-    { inputs = inputs
-    , invalidCaptchas = Set.empty
-    }
+    ( { inputs = inputs
+      , invalidCaptchas = Set.empty
+      , loadedGeoJsonData = Dict.empty
+      }
+    , Cmd.none
+    )
 
 
-update : Msg -> Model -> Model
-update msg _ =
-    msg
+update : Msg -> Model -> ( Model, Cmd msg )
+update msg model =
+    case msg of
+        InvalidCaptchas invalidCaptchas ->
+            ( { model | invalidCaptchas = invalidCaptchas }, Cmd.none )

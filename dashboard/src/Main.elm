@@ -19,21 +19,24 @@ type Model
 type Msg
     = Input String
     | Load
-    | DashboardMsg Dashboard.Model
+    | DashboardMsg Dashboard.Msg
 
 
 main : Program () Model Msg
 main =
-    Browser.sandbox
+    Browser.element
         { init = init
         , view = \model -> Element.layout [] (view model)
         , update = update
+        , subscriptions = \_ -> Sub.none
         }
 
 
-init : Model
-init =
-    WaitingInput { input = "", error = Nothing }
+init : flags -> ( Model, Cmd msg )
+init _ =
+    ( WaitingInput { input = "", error = Nothing }
+    , Cmd.none
+    )
 
 
 view : Model -> Element Msg
@@ -67,11 +70,11 @@ view model =
                 |> el [ Theme.padding ]
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model ) of
         ( Input input, WaitingInput _ ) ->
-            WaitingInput { input = input, error = Nothing }
+            ( WaitingInput { input = input, error = Nothing }, Cmd.none )
 
         ( Load, WaitingInput { input } ) ->
             case
@@ -93,25 +96,35 @@ update msg model =
                         )
             of
                 Ok inputs ->
-                    Dashboard (Dashboard.init inputs)
+                    let
+                        ( submodel, subcmd ) =
+                            Dashboard.init inputs
+                    in
+                    ( Dashboard submodel, Cmd.map DashboardMsg subcmd )
 
                 Err e ->
-                    WaitingInput
+                    ( WaitingInput
                         { input = input
                         , error = Just e
                         }
+                    , Cmd.none
+                    )
 
         ( DashboardMsg _, WaitingInput _ ) ->
-            model
+            ( model, Cmd.none )
 
         ( DashboardMsg submsg, Dashboard submodel ) ->
-            Dashboard (Dashboard.update submsg submodel)
+            let
+                ( newSubmodel, newSubcmd ) =
+                    Dashboard.update submsg submodel
+            in
+            ( Dashboard newSubmodel, Cmd.map DashboardMsg newSubcmd )
 
         ( Input _, Dashboard _ ) ->
-            model
+            ( model, Cmd.none )
 
         ( Load, Dashboard _ ) ->
-            model
+            ( model, Cmd.none )
 
 
 errorToString : Serialize.Error Never -> String

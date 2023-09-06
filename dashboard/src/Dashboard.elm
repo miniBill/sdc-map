@@ -13,6 +13,7 @@ import List.Extra
 import Pie
 import RemoteData exposing (RemoteData(..), WebData)
 import Result.Extra
+import Round
 import Set exposing (Set)
 import Task
 import Theme
@@ -296,11 +297,11 @@ viewOnMap model =
                         case findPosition model input of
                             Ok ( lat, lon, alt ) ->
                                 "("
-                                    ++ String.fromFloat lat
+                                    ++ Round.round 4 lat
                                     ++ ", "
-                                    ++ String.fromFloat lon
+                                    ++ Round.round 4 lon
                                     ++ ", "
-                                    ++ String.fromFloat alt
+                                    ++ Round.round 4 alt
                                     ++ ")"
 
                             Err e ->

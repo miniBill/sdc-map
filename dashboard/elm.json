@@ -26,6 +26,7 @@
             "miniBill/elm-codec": "2.1.0",
             "miniBill/elm-oklch": "1.0.0",
             "miniBill/elm-result-extra": "1.0.0",
+            "myrho/elm-round": "1.0.5",
             "prikhi/http-tasks": "1.0.0"
         },
         "indirect": {

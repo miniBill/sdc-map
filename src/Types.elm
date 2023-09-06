@@ -1,5 +1,6 @@
-module Types exposing (BackendModel, BackendMsg, EncryptedString(..), Error, FrontendModel(..), FrontendMsg(..), Input, ToBackend(..), ToFrontend(..), inputCodec)
+module Types exposing (BackendModel, BackendMsg, EncryptedString(..), Error, FrontendModel(..), FrontendMsg(..), Input, ToBackend(..), ToFrontend(..), inputCodec, inputOldCodec)
 
+import Codec
 import Dict exposing (Dict)
 import Random
 import Serialize exposing (Codec)
@@ -88,3 +89,27 @@ inputCodec =
         |> Serialize.field .id Serialize.string
         |> Serialize.field .captcha Serialize.string
         |> Serialize.finishRecord
+
+
+inputOldCodec : Codec.Codec Input
+inputOldCodec =
+    Codec.object
+        (\name country location nameOnMap id captcha ->
+            { name = name
+            , country =
+                country
+                    |> String.replace "United Kingdom of Great Britain and Northern Ireland" "UK"
+                    |> String.replace "United States of America" "USA"
+            , location = location
+            , nameOnMap = nameOnMap
+            , id = id
+            , captcha = captcha
+            }
+        )
+        |> Codec.field "name" .name Codec.string
+        |> Codec.field "country" .country Codec.string
+        |> Codec.field "location" .location Codec.string
+        |> Codec.maybeField "nameOnMap" .nameOnMap Codec.bool
+        |> Codec.field "id" .id Codec.string
+        |> Codec.field "captcha" .captcha Codec.string
+        |> Codec.buildObject

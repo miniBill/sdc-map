@@ -4,6 +4,7 @@ import AppUrl exposing (AppUrl)
 import Base64
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation
+import Codec
 import Dict
 import Element exposing (Element, centerX, el, fill, height, paddingEach, paragraph, rgb255, shrink, text, width)
 import Element.Background as Background
@@ -134,7 +135,6 @@ view model =
                 |> Flate.deflate
                 |> Base64.fromBytes
                 |> Maybe.withDefault "<failed>"
-                |> (\s -> String.fromInt (List.length inputs) ++ " : " ++ s)
                 |> text
                 |> List.singleton
                 |> paragraph []
@@ -409,18 +409,17 @@ encodeInput input =
 
 decodeInput : String -> Maybe Input
 decodeInput string =
-    Serialize.decodeFromString Types.inputCodec string
-        |> Result.toMaybe
-        |> Maybe.map
-            (\input ->
-                { input
-                    | country =
-                        input.country
-                            |> String.replace "United Kingdom of Great Britain and Northern Ireland" "UK"
-                            |> String.replace "United States of America" "USA"
-                    , captcha = String.toLower input.captcha
-                }
-            )
+    case Serialize.decodeFromString Types.inputCodec string of
+        Err _ ->
+            case Codec.decodeString Types.inputOldCodec string of
+                Ok input ->
+                    Just input
+
+                Err _ ->
+                    Nothing
+
+        Ok input ->
+            Just input
 
 
 subscriptions : FrontendModel -> Sub FrontendMsg

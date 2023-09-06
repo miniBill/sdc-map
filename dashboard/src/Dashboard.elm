@@ -1,6 +1,6 @@
 module Dashboard exposing (view)
 
-import Element exposing (Column, Element, alignTop, centerY, el, fill, px, shrink, text, width)
+import Element exposing (Column, Element, alignTop, centerY, el, fill, px, row, shrink, text, width)
 import Element.Border as Border
 import Element.Font as Font
 import List.Extra
@@ -18,7 +18,7 @@ view invalidCaptchas inputs =
             inputs
                 |> List.filter (\{ captcha } -> not (Set.member captcha invalidCaptchas))
     in
-    Theme.row [ width fill ]
+    row [ Theme.spacing, width fill ]
         [ Theme.column
             [ width fill
             , alignTop

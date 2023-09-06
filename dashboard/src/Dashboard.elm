@@ -44,7 +44,7 @@ view model =
 validInputs : Model -> List Input
 validInputs model =
     model.inputs
-        |> List.filter (\{ captcha } -> not (Set.member captcha model.invalidCaptchas))
+        |> List.filter (\{ captcha } -> not (Set.member (String.toLower captcha) model.invalidCaptchas))
 
 
 viewOnMap : Model -> Element Msg
@@ -100,10 +100,10 @@ viewCaptchas { invalidCaptchas, inputs } =
     card "Captchas"
         { data =
             inputs
-                |> List.Extra.gatherEqualsBy (\{ captcha } -> captcha)
+                |> List.Extra.gatherEqualsBy (\{ captcha } -> String.toLower captcha)
                 |> List.map
                     (\( { captcha }, rest ) ->
-                        { captcha = captcha
+                        { captcha = String.toLower captcha
                         , count = List.length rest + 1
                         }
                     )

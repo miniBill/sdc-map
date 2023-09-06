@@ -1,7 +1,7 @@
 module Dashboard exposing (Model, Msg, init, update, view)
 
 import Dict exposing (Dict)
-import Element exposing (Attribute, Column, Element, alignRight, alignTop, centerX, centerY, el, fill, paragraph, px, rgb, row, shrink, text, width)
+import Element exposing (Attribute, Column, Element, alignRight, alignTop, centerX, centerY, el, fill, paragraph, px, rgb, row, shrink, text, width, wrappedRow)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -97,110 +97,126 @@ validInputs model =
 
 viewOnMap : Model -> Element Msg
 viewOnMap model =
-    card "On map"
-        [ table []
-            { data =
-                validInputs model
-                    |> List.filter
-                        (\{ nameOnMap } ->
-                            (nameOnMap == Just True)
-                        )
-            , columns =
-                [ tableColumnText "Name" .name
-                , tableColumnText "Country" .country
-                , tableColumnText "Location" .location
-                ]
-            }
-        , el [ Border.widthEach { top = 1, bottom = 0, left = 0, right = 0 }, width fill ] Element.none
-        , case model.indexData of
-            Loading ->
-                text "Loading index data..."
-
-            NotAsked ->
-                text "Something went wrong with the index data."
-
-            Failure e ->
-                text <| Debug.toString e
-
-            Success _ ->
-                text "Loaded index data."
-        , table []
-            { data = Dict.toList model.geoJsonData
-            , columns =
-                [ tableColumnText "Country" Tuple.first
-                , tableColumnText "Status" <|
-                    \( _, geoJson ) ->
+    let
+        needed : List String
+        needed =
+            model.geoJsonData
+                |> Dict.toList
+                |> List.filterMap
+                    (\( country, geoJson ) ->
                         case geoJson of
-                            Failure (Just e) ->
-                                httpErrorToString e
+                            Failure (Just (Http.BadStatus 404)) ->
+                                model.indexData
+                                    |> RemoteData.toMaybe
+                                    |> Maybe.withDefault Dict.empty
+                                    |> Dict.get country
+                                    |> Maybe.map
+                                        (\{ threeLetterCode, level } ->
+                                            "geodata/gadm41_"
+                                                ++ threeLetterCode
+                                                ++ "_"
+                                                ++ String.fromInt (level - 2)
+                                                ++ ".json"
+                                        )
 
-                            Failure Nothing ->
-                                "Not found in index"
+                            _ ->
+                                Nothing
+                    )
+    in
+    card "On map" <|
+        wrappedRow [ Theme.spacing ]
+            [ table [ alignTop ]
+                { data =
+                    validInputs model
+                        |> List.filter
+                            (\{ nameOnMap } ->
+                                (nameOnMap == Just True)
+                            )
+                , columns =
+                    [ tableColumnText "Name" .name
+                    , tableColumnText "Country" .country
+                    , tableColumnText "Location" .location
+                    ]
+                }
+            , Theme.column [ alignTop ]
+                [ case model.indexData of
+                    Loading ->
+                        text "Loading index data..."
 
-                            NotAsked ->
-                                "Not asked???"
+                    NotAsked ->
+                        text "Something went wrong with the index data."
 
-                            Loading ->
-                                "Loading..."
+                    Failure e ->
+                        text <| Debug.toString e
 
-                            Success _ ->
-                                "Loaded"
-                , { header = text "Commands"
-                  , width = shrink
-                  , view =
-                        \( country, geoJson ) ->
-                            case geoJson of
-                                Failure (Just _) ->
-                                    Theme.button []
-                                        { label =
-                                            case
-                                                model.indexData
-                                                    |> RemoteData.toMaybe
-                                                    |> Maybe.withDefault Dict.empty
-                                                    |> Dict.get country
-                                            of
-                                                Nothing ->
-                                                    text "Reload"
+                    Success _ ->
+                        text "Loaded index data."
+                , table []
+                    { data = Dict.toList model.geoJsonData
+                    , columns =
+                        [ Just <| tableColumnText "Country" Tuple.first
+                        , Just <|
+                            tableColumnText "Status" <|
+                                \( _, geoJson ) ->
+                                    case geoJson of
+                                        Failure (Just e) ->
+                                            httpErrorToString e
 
-                                                Just { threeLetterCode, level } ->
-                                                    text <|
-                                                        "Reload "
-                                                            ++ threeLetterCode
-                                                            ++ "_"
-                                                            ++ String.fromInt (level - 2)
-                                        , onPress = Just (ReloadCountry country)
-                                        }
+                                        Failure Nothing ->
+                                            "Not found in index"
 
-                                _ ->
-                                    Element.none
-                  }
-                ]
-            }
-        , model.geoJsonData
-            |> Dict.toList
-            |> List.filterMap
-                (\( country, geoJson ) ->
-                    case geoJson of
-                        Failure (Just (Http.BadStatus 404)) ->
-                            model.indexData
-                                |> RemoteData.toMaybe
-                                |> Maybe.withDefault Dict.empty
-                                |> Dict.get country
-                                |> Maybe.map
-                                    (\{ threeLetterCode, level } ->
-                                        "geodata/gadm41_"
-                                            ++ threeLetterCode
-                                            ++ "_"
-                                            ++ String.fromInt (level - 2)
-                                            ++ ".json"
-                                    )
+                                        NotAsked ->
+                                            "Not asked???"
 
-                        _ ->
+                                        Loading ->
+                                            "Loading..."
+
+                                        Success _ ->
+                                            "Loaded"
+                        , if List.isEmpty needed then
                             Nothing
-                )
-            |> String.join " "
-            |> (\s -> paragraph [] [ text <| "make -j " ++ s ])
-        ]
+
+                          else
+                            { header = text "Commands"
+                            , width = shrink
+                            , view =
+                                \( country, geoJson ) ->
+                                    case geoJson of
+                                        Failure (Just _) ->
+                                            Theme.button []
+                                                { label =
+                                                    case
+                                                        model.indexData
+                                                            |> RemoteData.toMaybe
+                                                            |> Maybe.withDefault Dict.empty
+                                                            |> Dict.get country
+                                                    of
+                                                        Nothing ->
+                                                            text "Reload"
+
+                                                        Just { threeLetterCode, level } ->
+                                                            text <|
+                                                                "Reload "
+                                                                    ++ threeLetterCode
+                                                                    ++ "_"
+                                                                    ++ String.fromInt (level - 2)
+                                                , onPress = Just (ReloadCountry country)
+                                                }
+
+                                        _ ->
+                                            Element.none
+                            }
+                                |> Just
+                        ]
+                            |> List.filterMap identity
+                    }
+                , if List.isEmpty needed then
+                    Element.none
+
+                  else
+                    paragraph [] [ text <| String.join " " <| "make -j" :: needed ]
+                ]
+            ]
 
 
 httpErrorToString : Http.Error -> String
@@ -237,21 +253,22 @@ viewByCountry model =
                     )
                 |> List.sortBy (\{ count } -> -count)
     in
-    card "Statistics by country"
-        [ table []
-            { data =
-                data
-            , columns =
-                [ tableColumnText "Country" .country
-                , tableColumnNumber "Count" .count
-                ]
-            }
-        , data
-            |> List.map (\{ country, count } -> ( country, toFloat count ))
-            |> Pie.view
-            |> Element.html
-            |> el [ width <| px 500 ]
-        ]
+    card "Statistics by country" <|
+        Theme.column []
+            [ table []
+                { data =
+                    data
+                , columns =
+                    [ tableColumnText "Country" .country
+                    , tableColumnNumber "Count" .count
+                    ]
+                }
+            , data
+                |> List.map (\{ country, count } -> ( country, toFloat count ))
+                |> Pie.view
+                |> Element.html
+                |> el [ width <| px 500 ]
+            ]
 
 
 tableColumnNumber : String -> (element -> Int) -> Column element msg
@@ -272,8 +289,8 @@ tableColumnText headerLabel toCell =
 
 viewCaptchas : Model -> Element Msg
 viewCaptchas { invalidCaptchas, inputs } =
-    card "Captchas"
-        [ table []
+    card "Captchas" <|
+        table []
             { data =
                 inputs
                     |> List.Extra.gatherEqualsBy (\{ captcha } -> String.toLower captcha)
@@ -310,7 +327,6 @@ viewCaptchas { invalidCaptchas, inputs } =
                   }
                 ]
             }
-        ]
 
 
 table : List (Attribute msg) -> { data : List record, columns : List (Column record msg) } -> Element msg
@@ -389,9 +405,9 @@ header col child =
 
 card :
     String
-    -> List (Element msg)
     -> Element msg
-card label children =
+    -> Element msg
+card label child =
     Element.column
         [ width fill
         , alignTop
@@ -414,7 +430,7 @@ card label children =
             , Background.color <| rgb 0.8 0.8 0.8
             ]
             (text label)
-        , Theme.column
+        , el
             [ Border.width 1
             , Border.roundEach
                 { topLeft = 0
@@ -424,7 +440,7 @@ card label children =
                 }
             , Theme.padding
             ]
-            children
+            child
         ]
 
 

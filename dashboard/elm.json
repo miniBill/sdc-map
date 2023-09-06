@@ -25,7 +25,9 @@
             "mdgriffith/elm-ui": "1.1.8",
             "mgold/elm-geojson": "2.0.1",
             "miniBill/elm-codec": "2.1.0",
-            "miniBill/elm-oklch": "1.0.0"
+            "miniBill/elm-oklch": "1.0.0",
+            "miniBill/elm-result-extra": "1.0.0",
+            "prikhi/http-tasks": "1.0.0"
         },
         "indirect": {
             "bburdette/toop": "1.2.0",

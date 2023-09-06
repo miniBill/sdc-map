@@ -1,7 +1,7 @@
 module Dashboard exposing (Model, Msg, init, update, view)
 
 import Dict exposing (Dict)
-import Element exposing (Attribute, Column, Element, alignRight, alignTop, centerX, centerY, el, fill, px, rgb, row, shrink, text, width)
+import Element exposing (Attribute, Column, Element, alignRight, alignTop, centerX, centerY, el, fill, paragraph, px, rgb, row, shrink, text, width)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -12,6 +12,7 @@ import List.Extra
 import Pie
 import RemoteData exposing (RemoteData(..), WebData)
 import Set exposing (Set)
+import Task
 import Theme
 import Types exposing (Input)
 
@@ -20,6 +21,7 @@ type Msg
     = InvalidCaptchas (Set String)
     | GotIndexData (Result Http.Error (Dict Country { threeLetterCode : String, level : Int }))
     | GotGeoJson Country (Result (Maybe Http.Error) GeoJson)
+    | ReloadCountry Country
 
 
 type alias Model =
@@ -143,8 +145,61 @@ viewOnMap model =
 
                             Success _ ->
                                 "Loaded"
+                , { header = text "Commands"
+                  , width = shrink
+                  , view =
+                        \( country, geoJson ) ->
+                            case geoJson of
+                                Failure (Just _) ->
+                                    Theme.button []
+                                        { label =
+                                            case
+                                                model.indexData
+                                                    |> RemoteData.toMaybe
+                                                    |> Maybe.withDefault Dict.empty
+                                                    |> Dict.get country
+                                            of
+                                                Nothing ->
+                                                    text "Reload"
+
+                                                Just { threeLetterCode, level } ->
+                                                    text <|
+                                                        "Reload "
+                                                            ++ threeLetterCode
+                                                            ++ "_"
+                                                            ++ String.fromInt (level - 2)
+                                        , onPress = Just (ReloadCountry country)
+                                        }
+
+                                _ ->
+                                    Element.none
+                  }
                 ]
             }
+        , model.geoJsonData
+            |> Dict.toList
+            |> List.filterMap
+                (\( country, geoJson ) ->
+                    case geoJson of
+                        Failure (Just (Http.BadStatus 404)) ->
+                            model.indexData
+                                |> RemoteData.toMaybe
+                                |> Maybe.withDefault Dict.empty
+                                |> Dict.get country
+                                |> Maybe.map
+                                    (\{ threeLetterCode, level } ->
+                                        "geodata/gadm41_"
+                                            ++ threeLetterCode
+                                            ++ "_"
+                                            ++ String.fromInt (level - 2)
+                                            ++ ".json"
+                                    )
+
+                        _ ->
+                            Nothing
+                )
+            |> String.join " "
+            |> (\s -> paragraph [] [ text <| "make -j " ++ s ])
         ]
 
 
@@ -384,36 +439,24 @@ update msg model =
 
         GotIndexData (Ok result) ->
             let
-                ( countries, cmds ) =
+                newModel : Model
+                newModel =
+                    { model
+                        | indexData = Success result
+                    }
+
+                cmds : List (Cmd Msg)
+                cmds =
                     model.inputs
-                        |> List.map .country
+                        |> List.map
+                            (.country
+                                >> String.replace "UK" "United Kingdom"
+                            )
                         |> Set.fromList
                         |> Set.toList
-                        |> List.map
-                            (\country ->
-                                case Dict.get country result of
-                                    Nothing ->
-                                        ( ( country, Failure Nothing ), Cmd.none )
-
-                                    Just { threeLetterCode, level } ->
-                                        ( ( country, Loading )
-                                        , Http.get
-                                            { url = "/geodata/gadm41_" ++ threeLetterCode ++ "_" ++ String.fromInt (level - 2) ++ ".json"
-                                            , expect =
-                                                Http.expectJson
-                                                    (GotGeoJson country << Result.mapError Just)
-                                                    GeoJson.decoder
-                                            }
-                                        )
-                            )
-                        |> List.unzip
+                        |> List.map (loadCountry newModel)
             in
-            ( { model
-                | indexData = Success result
-                , geoJsonData = Dict.fromList countries
-              }
-            , Cmd.batch cmds
-            )
+            ( newModel, Cmd.batch cmds )
 
         GotGeoJson country result ->
             ( { model
@@ -421,3 +464,34 @@ update msg model =
               }
             , Cmd.none
             )
+
+        ReloadCountry country ->
+            ( model, loadCountry model country )
+
+
+loadCountry : Model -> Country -> Cmd Msg
+loadCountry model country =
+    case model.indexData of
+        Success result ->
+            case Dict.get country result of
+                Nothing ->
+                    Task.perform
+                        (GotGeoJson country)
+                        (Task.succeed (Err Nothing))
+
+                Just { threeLetterCode, level } ->
+                    Http.get
+                        { url =
+                            "/geodata/gadm41_"
+                                ++ threeLetterCode
+                                ++ "_"
+                                ++ String.fromInt (level - 2)
+                                ++ ".json"
+                        , expect =
+                            Http.expectJson
+                                (GotGeoJson country << Result.mapError Just)
+                                GeoJson.decoder
+                        }
+
+        _ ->
+            Cmd.none

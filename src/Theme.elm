@@ -1,4 +1,4 @@
-module Theme exposing (button, column, padding, row, rythm, spacing)
+module Theme exposing (button, column, padding, rythm, spacing)
 
 import Element exposing (Attribute, Element)
 import Element.Border as Border
@@ -18,11 +18,6 @@ spacing =
 rythm : number
 rythm =
     10
-
-
-row : List (Attribute msg) -> List (Element msg) -> Element msg
-row attrs children =
-    Element.row (spacing :: attrs) children
 
 
 column : List (Attribute msg) -> List (Element msg) -> Element msg

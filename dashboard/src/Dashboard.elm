@@ -79,12 +79,9 @@ type alias Country =
 
 view : Model -> Element Msg
 view model =
-    Theme.column []
-        [ row
-            [ Theme.spacing, width fill ]
-            [ viewByCountry model
-            , viewCaptchas model
-            ]
+    wrappedRow [ Theme.spacing ]
+        [ viewByCountry model
+        , viewCaptchas model
         , viewOnMap model
         ]
 
@@ -98,6 +95,13 @@ validInputs model =
 viewOnMap : Model -> Element Msg
 viewOnMap model =
     let
+        filteredInputs =
+            validInputs model
+                |> List.filter
+                    (\{ nameOnMap } ->
+                        (nameOnMap == Just True)
+                    )
+
         needed : List String
         needed =
             model.geoJsonData
@@ -126,12 +130,7 @@ viewOnMap model =
     card "On map" <|
         wrappedRow [ Theme.spacing ]
             [ table [ alignTop ]
-                { data =
-                    validInputs model
-                        |> List.filter
-                            (\{ nameOnMap } ->
-                                (nameOnMap == Just True)
-                            )
+                { data = filteredInputs
                 , columns =
                     [ tableColumnText "Name" .name
                     , tableColumnText "Country" .country
@@ -216,6 +215,17 @@ viewOnMap model =
                   else
                     paragraph [] [ text <| String.join " " <| "make -j" :: needed ]
                 ]
+            , table []
+                { data =
+                    filteredInputs
+                        |> List.Extra.gatherEqualsBy (\{ country, location } -> ( country, location ))
+                        |> List.map Tuple.first
+                        |> List.sortBy (\{ country, location } -> ( country, location ))
+                , columns =
+                    [ tableColumnText "Country" .country
+                    , tableColumnText "Location" .location
+                    ]
+                }
             ]
 
 

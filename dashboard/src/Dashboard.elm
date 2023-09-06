@@ -5,7 +5,7 @@ import Element exposing (Attribute, Column, Element, alignRight, alignTop, cente
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
-import GeoJson exposing (GeoJson, GeoJsonObject(..))
+import GeoJson exposing (GeoJsonObject(..), Geometry(..), Position)
 import Http
 import Http.Tasks
 import Json.Decode exposing (Decoder)
@@ -22,15 +22,24 @@ import Types exposing (Input)
 type Msg
     = InvalidCaptchas (Set String)
     | GotIndexData (Result Http.Error (Dict Country { threeLetterCode : String, level : Int }))
-    | GotGeoJson Country (Result (Maybe Http.Error) (List GeoJson))
+    | GotCapitalsData (Result Http.Error (Dict Country Position))
+    | GotGeoJson Country (Result (Maybe Http.Error) (List Location))
     | ReloadCountry Country
 
 
 type alias Model =
     { invalidCaptchas : Set String
     , inputs : List Input
-    , indexData : WebData (Dict String { threeLetterCode : String, level : Int })
-    , geoJsonData : Dict Country (RemoteData (Maybe Http.Error) (List GeoJson))
+    , indexData : WebData (Dict Country { threeLetterCode : String, level : Int })
+    , geoJsonData : Dict Country (RemoteData (Maybe Http.Error) (List Location))
+    , capitals : WebData (Dict Country Position)
+    }
+
+
+type alias Location =
+    { name : String
+    , alternativeNames : List String
+    , center : Position
     }
 
 
@@ -40,12 +49,57 @@ init inputs =
       , invalidCaptchas = Set.empty
       , geoJsonData = Dict.empty
       , indexData = Loading
+      , capitals = Loading
       }
-    , Http.get
-        { url = "/geodata-index.json"
-        , expect = Http.expectJson GotIndexData indexDataDecoder
-        }
+    , Cmd.batch
+        [ Http.get
+            { url = "/geodata/index.json"
+            , expect = Http.expectJson GotIndexData indexDataDecoder
+            }
+        , Http.get
+            { url = "/geodata/capitals.geojson"
+            , expect = Http.expectJson GotCapitalsData capitalsDataDecoder
+            }
+        ]
     )
+
+
+capitalsDataDecoder : Decoder (Dict Country Position)
+capitalsDataDecoder =
+    GeoJson.decoder
+        |> Json.Decode.andThen
+            (\( geoJson, _ ) ->
+                case geoJson of
+                    Geometry _ ->
+                        Json.Decode.fail "Unexpected geometry"
+
+                    Feature _ ->
+                        Json.Decode.fail "Unexpected feature"
+
+                    FeatureCollection objects ->
+                        objects
+                            |> Result.Extra.combineMap
+                                (\object ->
+                                    case
+                                        ( object.geometry
+                                        , Json.Decode.decodeValue
+                                            (Json.Decode.field "country" Json.Decode.string)
+                                            object.properties
+                                        )
+                                    of
+                                        ( Just (Point position), Ok country ) ->
+                                            Ok ( country, position )
+
+                                        ( _, Ok _ ) ->
+                                            Err "Unexpected feature"
+
+                                        ( _, Err e ) ->
+                                            Err (Json.Decode.errorToString e)
+                                )
+                            |> Result.mapError Json.Decode.fail
+                            |> Result.map (Dict.fromList >> Json.Decode.succeed)
+                            |> Result.Extra.merge
+            )
 
 
 indexDataDecoder : Decoder (Dict String { threeLetterCode : String, level : Int })
@@ -242,52 +296,80 @@ viewOnMap model =
             , columns =
                 [ tableColumnText "Country" .country
                 , tableColumnText "Location" .location
-                , tableColumnText "Found?" (found model)
+                , tableColumnText "Found?" (\input -> Debug.toString <| findPosition model input)
                 ]
             }
     }
 
 
-found : Model -> Input -> String
-found model { country, location } =
-    case Dict.get (normalizeCountry country) model.geoJsonData of
-        Nothing ->
-            "Missing (data)"
+findPosition : Model -> Input -> Result String Position
+findPosition model { country, location } =
+    if String.isEmpty location then
+        case model.capitals of
+            Loading ->
+                Err "Loading"
 
-        Just Loading ->
-            "Loading"
+            NotAsked ->
+                Err "Not asked?"
 
-        Just NotAsked ->
-            "Not asked?"
+            Failure _ ->
+                Err "Failure"
 
-        Just (Failure Nothing) ->
-            "Missing (index)"
+            Success capitals ->
+                case Dict.get country capitals of
+                    Nothing ->
+                        Err "Missing (capitals)"
 
-        Just (Failure _) ->
-            "Failure"
+                    Just capital ->
+                        Ok capital
 
-        Just (Success geoJsons) ->
-            case geoJsons of
-                [] ->
-                    "No jsons loaded"
+    else
+        case Dict.get (normalizeCountry country) model.geoJsonData of
+            Nothing ->
+                Err "Missing (data)"
 
-                _ ->
-                    geoJsons
-                        |> Result.Extra.combineMap
-                            (\( geoJson, _ ) ->
-                                case geoJson of
-                                    Geometry _ ->
-                                        Err "Unexpected geometry"
+            Just Loading ->
+                Err "Loading"
 
-                                    Feature _ ->
-                                        Err "Unexpected feature"
+            Just NotAsked ->
+                Err "Not asked?"
 
-                                    FeatureCollection objects ->
-                                        Ok objects
-                            )
-                        |> Result.map List.concat
-                        |> Result.map (\objects -> "TODO (" ++ String.fromInt (List.length objects) ++ ")")
-                        |> Result.Extra.merge
+            Just (Failure Nothing) ->
+                Err "Missing (index)"
+
+            Just (Failure _) ->
+                Err "Failure"
+
+            Just (Success locations) ->
+                case locations of
+                    [] ->
+                        Err "No jsons loaded"
+
+                    _ ->
+                        let
+                            normalized : String
+                            normalized =
+                                normalize location
+
+                            normalize : String -> String
+                            normalize s =
+                                String.toLower s |> String.replace " " ""
+                        in
+                        locations
+                            |> List.Extra.findMap
+                                (\loc ->
+                                    if
+                                        (normalize loc.name == normalized)
+                                            || List.member
+                                                normalized
+                                                (List.map normalize loc.alternativeNames)
+                                    then
+                                        Just (Ok loc.center)
+
+                                    else
+                                        Nothing
+                                )
+                            |> Maybe.withDefault (Err "Not found")
 
 
 httpErrorToString : Http.Error -> String
@@ -522,6 +604,9 @@ update msg model =
         GotIndexData (Err e) ->
             ( { model | indexData = Failure e }, Cmd.none )
 
+        GotCapitalsData result ->
+            ( { model | capitals = RemoteData.fromResult result }, Cmd.none )
+
         GotIndexData (Ok result) ->
             let
                 newModel : Model
@@ -590,11 +675,140 @@ loadCountry model country =
                                             ++ "_"
                                             ++ String.fromInt lvl
                                             ++ ".json"
-                                    , resolver = Http.Tasks.resolveJson GeoJson.decoder
+                                    , resolver = Http.Tasks.resolveJson geoJsonDecoder
                                     }
                             )
                         |> Task.sequence
+                        |> Task.map List.concat
                         |> Task.attempt (GotGeoJson country << Result.mapError Just)
 
         _ ->
             Cmd.none
+
+
+geoJsonDecoder : Decoder (List Location)
+geoJsonDecoder =
+    GeoJson.decoder
+        |> Json.Decode.andThen
+            (\( geoJsonObject, _ ) ->
+                -- "NAME_1": "Kärnten",
+                -- "VARNAME_1": "Carinthia|Caríntia|Carintia",
+                case geoJsonObject of
+                    Geometry _ ->
+                        Json.Decode.fail "Unexpected geometry"
+
+                    Feature _ ->
+                        Json.Decode.fail "Unexpected feature"
+
+                    FeatureCollection objects ->
+                        case
+                            objects
+                                |> Result.Extra.combineMap
+                                    (\object ->
+                                        Result.map2
+                                            (\( name, varName ) geometry ->
+                                                { name = name
+                                                , alternativeNames =
+                                                    if varName == "NA" then
+                                                        []
+
+                                                    else
+                                                        String.split "|" varName
+                                                , center = getCentroid geometry
+                                                }
+                                            )
+                                            (Json.Decode.decodeValue nameDecoder
+                                                object.properties
+                                                |> Result.mapError Json.Decode.errorToString
+                                            )
+                                            (object.geometry
+                                                |> Result.fromMaybe "Missing geometry"
+                                            )
+                                    )
+                        of
+                            Ok result ->
+                                Json.Decode.succeed result
+
+                            Err e ->
+                                Json.Decode.fail e
+            )
+
+
+getCentroid : Geometry -> Position
+getCentroid geometry =
+    let
+        getMedian : List Position -> Position
+        getMedian list =
+            let
+                len : Int
+                len =
+                    List.length list
+
+                medianLength : Int
+                medianLength =
+                    -- 1 if odd, 2 if even
+                    1 + modBy 2 len
+
+                do : (Position -> Float) -> Float
+                do f =
+                    list
+                        |> List.map f
+                        |> List.sort
+                        |> List.drop (len // 2)
+                        |> List.take medianLength
+                        |> List.sum
+                        |> (\s -> s / toFloat medianLength)
+            in
+            ( do <| \( lat, _, _ ) -> lat
+            , do <| \( _, lon, _ ) -> lon
+            , do <| \( _, _, alt ) -> alt
+            )
+    in
+    case geometry of
+        Point p ->
+            p
+
+        MultiPoint positions ->
+            getMedian positions
+
+        LineString positions ->
+            getMedian positions
+
+        MultiLineString positions ->
+            getMedian (List.concat positions)
+
+        Polygon positions ->
+            getMedian (List.concat positions)
+
+        MultiPolygon positions ->
+            getMedian (List.concat <| List.concat positions)
+
+        GeometryCollection geometries ->
+            getMedian (List.map getCentroid geometries)
+
+
+nameDecoder : Decoder ( String, String )
+nameDecoder =
+    let
+        decoderAtLevel level =
+            let
+                suffix =
+                    String.fromInt level
+            in
+            Json.Decode.field ("NAME_" ++ suffix) Json.Decode.string
+                |> Json.Decode.andThen
+                    (\name ->
+                        Json.Decode.oneOf
+                            [ decoderAtLevel (level + 1)
+                            , Json.Decode.oneOf
+                                [ Json.Decode.field ("VARNAME_" ++ suffix) Json.Decode.string
+                                , Json.Decode.succeed ""
+                                ]
+                                |> Json.Decode.map
+                                    (\varName ->
+                                        ( name, varName )
+                                    )
+                            ]
+                    )
+    in
+    decoderAtLevel 1

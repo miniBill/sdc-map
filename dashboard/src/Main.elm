@@ -28,7 +28,10 @@ main : Program () Model Msg
 main =
     Browser.element
         { init = init
-        , view = \model -> Element.layout [] (view model)
+        , view =
+            \model ->
+                Element.layout []
+                    (view model)
         , update = update
         , subscriptions = \_ -> Sub.none
         }

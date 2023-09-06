@@ -93,7 +93,7 @@ update msg model =
                             bytes
                                 |> Serialize.decodeFromBytes
                                     (Serialize.list Types.inputCodec)
-                                |> Result.mapError Debug.toString
+                                |> Result.mapError errorToString
                         )
             of
                 Ok inputs ->
@@ -119,3 +119,16 @@ update msg model =
 
         ( Load, Ready _ ) ->
             model
+
+
+errorToString : Serialize.Error Never -> String
+errorToString error =
+    case error of
+        Serialize.CustomError ever ->
+            never ever
+
+        Serialize.DataCorrupted ->
+            "Data corrupted"
+
+        Serialize.SerializerOutOfDate ->
+            "Serializer out of date"

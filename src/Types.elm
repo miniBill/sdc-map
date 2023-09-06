@@ -57,7 +57,6 @@ type FrontendMsg
     | AdminSecretKey String
     | Decrypt
     | Decrypted (List String)
-    | CaptchaIsValid String Bool
       -- Nop
     | Nop
 

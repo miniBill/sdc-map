@@ -5,12 +5,14 @@ import Element exposing (Attribute, Column, Element, alignRight, alignTop, cente
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
-import GeoJson exposing (GeoJson)
+import GeoJson exposing (GeoJson, GeoJsonObject(..))
 import Http
+import Http.Tasks
 import Json.Decode exposing (Decoder)
 import List.Extra
 import Pie
 import RemoteData exposing (RemoteData(..), WebData)
+import Result.Extra
 import Set exposing (Set)
 import Task
 import Theme
@@ -20,7 +22,7 @@ import Types exposing (Input)
 type Msg
     = InvalidCaptchas (Set String)
     | GotIndexData (Result Http.Error (Dict Country { threeLetterCode : String, level : Int }))
-    | GotGeoJson Country (Result (Maybe Http.Error) GeoJson)
+    | GotGeoJson Country (Result (Maybe Http.Error) (List GeoJson))
     | ReloadCountry Country
 
 
@@ -28,7 +30,7 @@ type alias Model =
     { invalidCaptchas : Set String
     , inputs : List Input
     , indexData : WebData (Dict String { threeLetterCode : String, level : Int })
-    , geoJsonData : Dict Country (RemoteData (Maybe Http.Error) GeoJson)
+    , geoJsonData : Dict Country (RemoteData (Maybe Http.Error) (List GeoJson))
     }
 
 
@@ -130,16 +132,21 @@ viewOnMap model =
                                     |> Dict.get country
                                     |> Maybe.map
                                         (\{ threeLetterCode, level } ->
-                                            "geodata/gadm41_"
-                                                ++ threeLetterCode
-                                                ++ "_"
-                                                ++ String.fromInt (level - 2)
-                                                ++ ".json"
+                                            List.range 1 (level - 2)
+                                                |> List.map
+                                                    (\lvl ->
+                                                        "geodata/gadm41_"
+                                                            ++ threeLetterCode
+                                                            ++ "_"
+                                                            ++ String.fromInt lvl
+                                                            ++ ".json"
+                                                    )
                                         )
 
                             _ ->
                                 Nothing
                     )
+                |> List.concat
     in
     { onMap =
         table [ alignTop ]
@@ -207,12 +214,8 @@ viewOnMap model =
                                                     Nothing ->
                                                         text "Reload"
 
-                                                    Just { threeLetterCode, level } ->
-                                                        text <|
-                                                            "Reload "
-                                                                ++ threeLetterCode
-                                                                ++ "_"
-                                                                ++ String.fromInt (level - 2)
+                                                    Just { threeLetterCode } ->
+                                                        text <| "Reload " ++ threeLetterCode
                                             , onPress = Just (ReloadCountry country)
                                             }
 
@@ -247,7 +250,44 @@ viewOnMap model =
 
 found : Model -> Input -> String
 found model { country, location } =
-    "TODO"
+    case Dict.get (normalizeCountry country) model.geoJsonData of
+        Nothing ->
+            "Missing (data)"
+
+        Just Loading ->
+            "Loading"
+
+        Just NotAsked ->
+            "Not asked?"
+
+        Just (Failure Nothing) ->
+            "Missing (index)"
+
+        Just (Failure _) ->
+            "Failure"
+
+        Just (Success geoJsons) ->
+            case geoJsons of
+                [] ->
+                    "No jsons loaded"
+
+                _ ->
+                    geoJsons
+                        |> Result.Extra.combineMap
+                            (\( geoJson, _ ) ->
+                                case geoJson of
+                                    Geometry _ ->
+                                        Err "Unexpected geometry"
+
+                                    Feature _ ->
+                                        Err "Unexpected feature"
+
+                                    FeatureCollection objects ->
+                                        Ok objects
+                            )
+                        |> Result.map List.concat
+                        |> Result.map (\objects -> "TODO (" ++ String.fromInt (List.length objects) ++ ")")
+                        |> Result.Extra.merge
 
 
 httpErrorToString : Http.Error -> String
@@ -494,7 +534,7 @@ update msg model =
                     model.inputs
                         |> List.map
                             (.country
-                                >> String.replace "UK" "United Kingdom"
+                                >> normalizeCountry
                             )
                         |> Set.fromList
                         |> Set.toList
@@ -524,6 +564,11 @@ update msg model =
             ( model, loadCountry model country )
 
 
+normalizeCountry : String -> String
+normalizeCountry =
+    String.replace "UK" "United Kingdom"
+
+
 loadCountry : Model -> Country -> Cmd Msg
 loadCountry model country =
     case model.indexData of
@@ -535,18 +580,21 @@ loadCountry model country =
                         (Task.succeed (Err Nothing))
 
                 Just { threeLetterCode, level } ->
-                    Http.get
-                        { url =
-                            "/geodata/gadm41_"
-                                ++ threeLetterCode
-                                ++ "_"
-                                ++ String.fromInt (level - 2)
-                                ++ ".json"
-                        , expect =
-                            Http.expectJson
-                                (GotGeoJson country << Result.mapError Just)
-                                GeoJson.decoder
-                        }
+                    List.range 1 (level - 2)
+                        |> List.map
+                            (\lvl ->
+                                Http.Tasks.get
+                                    { url =
+                                        "/geodata/gadm41_"
+                                            ++ threeLetterCode
+                                            ++ "_"
+                                            ++ String.fromInt lvl
+                                            ++ ".json"
+                                    , resolver = Http.Tasks.resolveJson GeoJson.decoder
+                                    }
+                            )
+                        |> Task.sequence
+                        |> Task.attempt (GotGeoJson country << Result.mapError Just)
 
         _ ->
             Cmd.none

@@ -42,7 +42,6 @@ app =
                         [ width fill
                         , height fill
                         , Theme.padding
-                        , Font.family [ Font.typeface "Papyrus" ]
                         , Background.color <| rgb255 0xC0 0xBD 0xB6
                         , Font.color <| rgb255 0x27 0x28 0x1A
                         ]

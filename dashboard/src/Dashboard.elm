@@ -1,7 +1,8 @@
 module Dashboard exposing (Model, Msg, init, update, view)
 
 import Dict exposing (Dict)
-import Element exposing (Column, Element, alignTop, centerY, el, fill, px, row, shrink, text, width)
+import Element exposing (Attribute, Column, Element, alignRight, alignTop, centerX, centerY, el, fill, px, rgb, row, shrink, text, width)
+import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import GeoJson exposing (GeoJson)
@@ -9,7 +10,7 @@ import Http
 import Json.Decode exposing (Decoder)
 import List.Extra
 import Pie
-import RemoteData exposing (WebData)
+import RemoteData exposing (RemoteData(..), WebData)
 import Set exposing (Set)
 import Theme
 import Types exposing (Input)
@@ -33,7 +34,7 @@ init inputs =
     ( { inputs = inputs
       , invalidCaptchas = Set.empty
       , loadedGeoJsonData = Dict.empty
-      , indexData = RemoteData.Loading
+      , indexData = Loading
       }
     , Http.get
         { url = "/geodata-index.json"
@@ -93,22 +94,33 @@ validInputs model =
 
 viewOnMap : Model -> Element Msg
 viewOnMap model =
-    Theme.column []
-        [ card "On map"
-            [ Element.table [ Theme.spacing ]
-                { data =
-                    validInputs model
-                        |> List.filter
-                            (\{ nameOnMap } ->
-                                (nameOnMap == Just True)
-                            )
-                , columns =
-                    [ tableColumn "Name" .name
-                    , tableColumn "Country" .country
-                    , tableColumn "Location" .location
-                    ]
-                }
-            ]
+    card "On map"
+        [ table []
+            { data =
+                validInputs model
+                    |> List.filter
+                        (\{ nameOnMap } ->
+                            (nameOnMap == Just True)
+                        )
+            , columns =
+                [ tableColumnText "Name" .name
+                , tableColumnText "Country" .country
+                , tableColumnText "Location" .location
+                ]
+            }
+        , el [ Border.widthEach { top = 1, bottom = 0, left = 0, right = 0 }, width fill ] Element.none
+        , case model.indexData of
+            Loading ->
+                text "Loading index data..."
+
+            NotAsked ->
+                text "Something went wrong with the index data."
+
+            Failure e ->
+                text <| Debug.toString e
+
+            Success _ ->
+                text "Loaded index data."
         ]
 
 
@@ -128,12 +140,12 @@ viewByCountry model =
                 |> List.sortBy (\{ count } -> -count)
     in
     card "Statistics by country"
-        [ Element.table [ Theme.spacing ]
+        [ table []
             { data =
                 data
             , columns =
-                [ tableColumn "Country" .country
-                , tableColumn "Count" <| \{ count } -> String.fromInt count
+                [ tableColumnText "Country" .country
+                , tableColumnNumber "Count" .count
                 ]
             }
         , data
@@ -144,10 +156,18 @@ viewByCountry model =
         ]
 
 
-tableColumn : String -> (element -> String) -> Column element msg
-tableColumn header toCell =
-    { header = el [ Font.bold ] <| text header
-    , view = \row -> el [ centerY ] <| text (toCell row)
+tableColumnNumber : String -> (element -> Int) -> Column element msg
+tableColumnNumber headerLabel toCell =
+    { header = text headerLabel
+    , view = \row -> el [ centerY, alignRight ] <| text <| String.fromInt <| toCell row
+    , width = shrink
+    }
+
+
+tableColumnText : String -> (element -> String) -> Column element msg
+tableColumnText headerLabel toCell =
+    { header = text headerLabel
+    , view = \row -> el [ centerY ] <| text <| toCell row
     , width = shrink
     }
 
@@ -155,7 +175,7 @@ tableColumn header toCell =
 viewCaptchas : Model -> Element Msg
 viewCaptchas { invalidCaptchas, inputs } =
     card "Captchas"
-        [ Element.table [ Theme.spacing ]
+        [ table []
             { data =
                 inputs
                     |> List.Extra.gatherEqualsBy (\{ captcha } -> String.toLower captcha)
@@ -167,9 +187,9 @@ viewCaptchas { invalidCaptchas, inputs } =
                         )
                     |> List.sortBy (\{ count } -> -count)
             , columns =
-                [ tableColumn "Captcha" .captcha
-                , tableColumn "Count" <| \{ count } -> String.fromInt count
-                , { header = el [ Font.bold ] <| text "Is valid"
+                [ tableColumnText "Captcha" .captcha
+                , tableColumnNumber "Count" .count
+                , { header = text "Is valid"
                   , view =
                         \{ captcha } ->
                             let
@@ -180,7 +200,7 @@ viewCaptchas { invalidCaptchas, inputs } =
                                     else
                                         ( "Yes", Set.insert )
                             in
-                            Theme.button []
+                            Theme.button [ centerX ]
                                 { onPress =
                                     invalidCaptchas
                                         |> updater captcha
@@ -195,20 +215,119 @@ viewCaptchas { invalidCaptchas, inputs } =
         ]
 
 
+table : List (Attribute msg) -> { data : List record, columns : List (Column record msg) } -> Element msg
+table attrs config =
+    Element.indexedTable attrs
+        { data = config.data
+        , columns =
+            config.columns
+                |> List.indexedMap
+                    (\col column ->
+                        { header = header col column.header
+                        , view = \row -> cell row col column.view
+                        , width = column.width
+                        }
+                    )
+        }
+
+
+cell : Int -> Int -> (record -> Element msg) -> record -> Element msg
+cell row col cellView record =
+    let
+        leftPadding =
+            if col == 0 then
+                0
+
+            else
+                Theme.rythm
+
+        topPadding =
+            if row == 0 then
+                Theme.rythm // 2
+
+            else
+                Theme.rythm
+    in
+    el
+        [ Element.paddingEach
+            { left = leftPadding
+            , right = 0
+            , top = topPadding
+            , bottom = 0
+            }
+        , centerY
+        ]
+        (cellView record)
+
+
+header : Int -> Element msg -> Element msg
+header col child =
+    el
+        [ Font.bold
+        , Border.widthEach
+            { top = 0
+            , left = 0
+            , right = 0
+            , bottom = 1
+            }
+        , if col == 0 then
+            Element.paddingEach
+                { left = 0
+                , right = 0
+                , top = 0
+                , bottom = Theme.rythm // 2
+                }
+
+          else
+            Element.paddingEach
+                { left = Theme.rythm
+                , right = 0
+                , top = 0
+                , bottom = Theme.rythm // 2
+                }
+        ]
+        child
+
+
 card :
     String
     -> List (Element msg)
     -> Element msg
 card label children =
-    Theme.column
-        [ Border.width 1
-        , Theme.padding
-        , width fill
+    Element.column
+        [ width fill
         , alignTop
         ]
-        (el [ Font.bold ] (text label)
-            :: children
-        )
+        [ el
+            [ Font.bold
+            , Theme.padding
+            , Border.widthEach
+                { top = 1
+                , left = 1
+                , right = 1
+                , bottom = 0
+                }
+            , Border.roundEach
+                { topLeft = Theme.rythm
+                , topRight = Theme.rythm
+                , bottomLeft = 0
+                , bottomRight = 0
+                }
+            , Background.color <| rgb 0.8 0.8 0.8
+            ]
+            (text label)
+        , Theme.column
+            [ Border.width 1
+            , Border.roundEach
+                { topLeft = 0
+                , topRight = Theme.rythm
+                , bottomLeft = Theme.rythm
+                , bottomRight = Theme.rythm
+                }
+            , Theme.padding
+            ]
+            children
+        ]
 
 
 update : Msg -> Model -> ( Model, Cmd msg )

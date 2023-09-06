@@ -1,7 +1,7 @@
-module Dashboard exposing (Model, Msg, init, update, view)
+module Dashboard exposing (Country, Location, Model, Msg, init, update, view)
 
 import Dict exposing (Dict)
-import Element exposing (Attribute, Column, Element, alignRight, alignTop, centerX, centerY, el, fill, paragraph, px, rgb, row, shrink, text, width, wrappedRow)
+import Element exposing (Attribute, Column, Element, alignRight, alignTop, centerX, centerY, el, fill, paragraph, px, rgb, shrink, text, width, wrappedRow)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -165,6 +165,7 @@ viewOnMap :
         }
 viewOnMap model =
     let
+        filteredInputs : List Input
         filteredInputs =
             validInputs model
                 |> List.filter
@@ -217,11 +218,8 @@ viewOnMap model =
                 Loading ->
                     text "Loading index data..."
 
-                NotAsked ->
-                    text "Something went wrong with the index data."
-
                 Failure e ->
-                    text <| Debug.toString e
+                    text <| httpErrorToString e
 
                 Success _ ->
                     text "Loaded index data."
@@ -238,9 +236,6 @@ viewOnMap model =
 
                                     Failure Nothing ->
                                         "Not found in index"
-
-                                    NotAsked ->
-                                        "Not asked???"
 
                                     Loading ->
                                         "Loading..."
@@ -296,7 +291,21 @@ viewOnMap model =
             , columns =
                 [ tableColumnText "Country" .country
                 , tableColumnText "Location" .location
-                , tableColumnText "Found?" (\input -> Debug.toString <| findPosition model input)
+                , tableColumnText "Found?"
+                    (\input ->
+                        case findPosition model input of
+                            Ok ( lat, lon, alt ) ->
+                                "("
+                                    ++ String.fromFloat lat
+                                    ++ ", "
+                                    ++ String.fromFloat lon
+                                    ++ ", "
+                                    ++ String.fromFloat alt
+                                    ++ ")"
+
+                            Err e ->
+                                "Err: " ++ e
+                    )
                 ]
             }
     }
@@ -308,9 +317,6 @@ findPosition model { country, location } =
         case model.capitals of
             Loading ->
                 Err "Loading"
-
-            NotAsked ->
-                Err "Not asked?"
 
             Failure _ ->
                 Err "Failure"
@@ -330,9 +336,6 @@ findPosition model { country, location } =
 
             Just Loading ->
                 Err "Loading"
-
-            Just NotAsked ->
-                Err "Not asked?"
 
             Just (Failure Nothing) ->
                 Err "Missing (index)"
@@ -394,6 +397,7 @@ httpErrorToString error =
 viewByCountry : Model -> Element Msg
 viewByCountry model =
     let
+        data : List { country : String, count : Int }
         data =
             model
                 |> validInputs
@@ -499,6 +503,7 @@ table attrs config =
 cell : Int -> Int -> (record -> Element msg) -> record -> Element msg
 cell row col cellView record =
     let
+        leftPadding : number
         leftPadding =
             if col == 0 then
                 0
@@ -506,6 +511,7 @@ cell row col cellView record =
             else
                 Theme.rythm
 
+        topPadding : Int
         topPadding =
             if row == 0 then
                 Theme.rythm // 2
@@ -615,6 +621,7 @@ update msg model =
                         | indexData = Success result
                     }
 
+                countries : List String
                 countries =
                     model.inputs
                         |> List.map
@@ -790,8 +797,10 @@ getCentroid geometry =
 nameDecoder : Decoder ( String, String )
 nameDecoder =
     let
+        decoderAtLevel : Int -> Decoder ( String, String )
         decoderAtLevel level =
             let
+                suffix : String
                 suffix =
                     String.fromInt level
             in

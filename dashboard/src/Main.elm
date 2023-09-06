@@ -4,12 +4,13 @@ import Base64
 import Browser
 import Dashboard
 import Element exposing (Element, el, paragraph, text)
+import Element.Font as Font
 import Element.Input as Input
 import Flate
 import Html.Attributes
 import Serialize
 import Theme
-import Types exposing (Input)
+import Types
 
 
 type Model

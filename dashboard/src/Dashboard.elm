@@ -79,11 +79,19 @@ type alias Country =
 
 view : Model -> Element Msg
 view model =
-    wrappedRow [ Theme.spacing ]
-        [ viewByCountry model
-        , viewCaptchas model
-        , viewOnMap model
+    let
+        { onMap, geoData, locations } =
+            viewOnMap model
+    in
+    [ card "Statistics by country" <| viewByCountry model
+    , Theme.column [ alignTop ]
+        [ card "Captchas" <| viewCaptchas model
+        , card "GeoData" geoData
         ]
+    , card "On map" onMap
+    , card "Locations" locations
+    ]
+        |> wrappedRow [ Theme.spacing ]
 
 
 validInputs : Model -> List Input
@@ -92,7 +100,13 @@ validInputs model =
         |> List.filter (\{ captcha } -> not (Set.member (String.toLower captcha) model.invalidCaptchas))
 
 
-viewOnMap : Model -> Element Msg
+viewOnMap :
+    Model
+    ->
+        { onMap : Element msg
+        , geoData : Element Msg
+        , locations : Element msg
+        }
 viewOnMap model =
     let
         filteredInputs =
@@ -127,106 +141,107 @@ viewOnMap model =
                                 Nothing
                     )
     in
-    card "On map" <|
-        wrappedRow [ Theme.spacing ]
-            [ table [ alignTop ]
-                { data = filteredInputs
-                , columns =
-                    [ tableColumnText "Name" .name
-                    , tableColumnText "Country" .country
-                    , tableColumnText "Location" .location
-                    ]
-                }
-            , Theme.column [ alignTop ]
-                [ case model.indexData of
-                    Loading ->
-                        text "Loading index data..."
-
-                    NotAsked ->
-                        text "Something went wrong with the index data."
-
-                    Failure e ->
-                        text <| Debug.toString e
-
-                    Success _ ->
-                        text "Loaded index data."
-                , table []
-                    { data = Dict.toList model.geoJsonData
-                    , columns =
-                        [ Just <| tableColumnText "Country" Tuple.first
-                        , Just <|
-                            tableColumnText "Status" <|
-                                \( _, geoJson ) ->
-                                    case geoJson of
-                                        Failure (Just e) ->
-                                            httpErrorToString e
-
-                                        Failure Nothing ->
-                                            "Not found in index"
-
-                                        NotAsked ->
-                                            "Not asked???"
-
-                                        Loading ->
-                                            "Loading..."
-
-                                        Success _ ->
-                                            "Loaded"
-                        , if List.isEmpty needed then
-                            Nothing
-
-                          else
-                            { header = text "Commands"
-                            , width = shrink
-                            , view =
-                                \( country, geoJson ) ->
-                                    case geoJson of
-                                        Failure (Just _) ->
-                                            Theme.button []
-                                                { label =
-                                                    case
-                                                        model.indexData
-                                                            |> RemoteData.toMaybe
-                                                            |> Maybe.withDefault Dict.empty
-                                                            |> Dict.get country
-                                                    of
-                                                        Nothing ->
-                                                            text "Reload"
-
-                                                        Just { threeLetterCode, level } ->
-                                                            text <|
-                                                                "Reload "
-                                                                    ++ threeLetterCode
-                                                                    ++ "_"
-                                                                    ++ String.fromInt (level - 2)
-                                                , onPress = Just (ReloadCountry country)
-                                                }
-
-                                        _ ->
-                                            Element.none
-                            }
-                                |> Just
-                        ]
-                            |> List.filterMap identity
-                    }
-                , if List.isEmpty needed then
-                    Element.none
-
-                  else
-                    paragraph [] [ text <| String.join " " <| "make -j" :: needed ]
+    { onMap =
+        table [ alignTop ]
+            { data = filteredInputs
+            , columns =
+                [ tableColumnText "Name" .name
+                , tableColumnText "Country" .country
+                , tableColumnText "Location" .location
                 ]
+            }
+    , geoData =
+        Theme.column [ alignTop ]
+            [ case model.indexData of
+                Loading ->
+                    text "Loading index data..."
+
+                NotAsked ->
+                    text "Something went wrong with the index data."
+
+                Failure e ->
+                    text <| Debug.toString e
+
+                Success _ ->
+                    text "Loaded index data."
             , table []
-                { data =
-                    filteredInputs
-                        |> List.Extra.gatherEqualsBy (\{ country, location } -> ( country, location ))
-                        |> List.map Tuple.first
-                        |> List.sortBy (\{ country, location } -> ( country, location ))
+                { data = Dict.toList model.geoJsonData
                 , columns =
-                    [ tableColumnText "Country" .country
-                    , tableColumnText "Location" .location
+                    [ Just <| tableColumnText "Country" Tuple.first
+                    , Just <|
+                        tableColumnText "Status" <|
+                            \( _, geoJson ) ->
+                                case geoJson of
+                                    Failure (Just e) ->
+                                        httpErrorToString e
+
+                                    Failure Nothing ->
+                                        "Not found in index"
+
+                                    NotAsked ->
+                                        "Not asked???"
+
+                                    Loading ->
+                                        "Loading..."
+
+                                    Success _ ->
+                                        "Loaded"
+                    , if List.isEmpty needed then
+                        Nothing
+
+                      else
+                        { header = text "Commands"
+                        , width = shrink
+                        , view =
+                            \( country, geoJson ) ->
+                                case geoJson of
+                                    Failure (Just _) ->
+                                        Theme.button []
+                                            { label =
+                                                case
+                                                    model.indexData
+                                                        |> RemoteData.toMaybe
+                                                        |> Maybe.withDefault Dict.empty
+                                                        |> Dict.get country
+                                                of
+                                                    Nothing ->
+                                                        text "Reload"
+
+                                                    Just { threeLetterCode, level } ->
+                                                        text <|
+                                                            "Reload "
+                                                                ++ threeLetterCode
+                                                                ++ "_"
+                                                                ++ String.fromInt (level - 2)
+                                            , onPress = Just (ReloadCountry country)
+                                            }
+
+                                    _ ->
+                                        Element.none
+                        }
+                            |> Just
                     ]
+                        |> List.filterMap identity
                 }
+            , if List.isEmpty needed then
+                Element.none
+
+              else
+                paragraph [] [ text <| String.join " " <| "make -j" :: needed ]
             ]
+    , locations =
+        table []
+            { data =
+                filteredInputs
+                    |> List.Extra.gatherEqualsBy (\{ country, location } -> ( country, location ))
+                    |> List.map Tuple.first
+                    |> List.sortBy (\{ country, location } -> ( country, location ))
+            , columns =
+                [ tableColumnText "Country" .country
+                , tableColumnText "Location" .location
+                ]
+            }
+    }
 
 
 httpErrorToString : Http.Error -> String
@@ -263,22 +278,21 @@ viewByCountry model =
                     )
                 |> List.sortBy (\{ count } -> -count)
     in
-    card "Statistics by country" <|
-        Theme.column []
-            [ table []
-                { data =
-                    data
-                , columns =
-                    [ tableColumnText "Country" .country
-                    , tableColumnNumber "Count" .count
-                    ]
-                }
-            , data
-                |> List.map (\{ country, count } -> ( country, toFloat count ))
-                |> Pie.view
-                |> Element.html
-                |> el [ width <| px 500 ]
-            ]
+    Theme.column []
+        [ table []
+            { data =
+                data
+            , columns =
+                [ tableColumnText "Country" .country
+                , tableColumnNumber "Count" .count
+                ]
+            }
+        , data
+            |> List.map (\{ country, count } -> ( country, toFloat count ))
+            |> Pie.view
+            |> Element.html
+            |> el [ width <| px 500 ]
+        ]
 
 
 tableColumnNumber : String -> (element -> Int) -> Column element msg
@@ -299,44 +313,43 @@ tableColumnText headerLabel toCell =
 
 viewCaptchas : Model -> Element Msg
 viewCaptchas { invalidCaptchas, inputs } =
-    card "Captchas" <|
-        table []
-            { data =
-                inputs
-                    |> List.Extra.gatherEqualsBy (\{ captcha } -> String.toLower captcha)
-                    |> List.map
-                        (\( { captcha }, rest ) ->
-                            { captcha = String.toLower captcha
-                            , count = List.length rest + 1
-                            }
-                        )
-                    |> List.sortBy (\{ count } -> -count)
-            , columns =
-                [ tableColumnText "Captcha" .captcha
-                , tableColumnNumber "Count" .count
-                , { header = text "Is valid"
-                  , view =
-                        \{ captcha } ->
-                            let
-                                ( label, updater ) =
-                                    if Set.member captcha invalidCaptchas then
-                                        ( "No", Set.remove )
+    table []
+        { data =
+            inputs
+                |> List.Extra.gatherEqualsBy (\{ captcha } -> String.toLower captcha)
+                |> List.map
+                    (\( { captcha }, rest ) ->
+                        { captcha = String.toLower captcha
+                        , count = List.length rest + 1
+                        }
+                    )
+                |> List.sortBy (\{ count } -> -count)
+        , columns =
+            [ tableColumnText "Captcha" .captcha
+            , tableColumnNumber "Count" .count
+            , { header = text "Is valid"
+              , view =
+                    \{ captcha } ->
+                        let
+                            ( label, updater ) =
+                                if Set.member captcha invalidCaptchas then
+                                    ( "No", Set.remove )
 
-                                    else
-                                        ( "Yes", Set.insert )
-                            in
-                            Theme.button [ centerX ]
-                                { onPress =
-                                    invalidCaptchas
-                                        |> updater captcha
-                                        |> InvalidCaptchas
-                                        |> Just
-                                , label = text label
-                                }
-                  , width = shrink
-                  }
-                ]
-            }
+                                else
+                                    ( "Yes", Set.insert )
+                        in
+                        Theme.button [ centerX ]
+                            { onPress =
+                                invalidCaptchas
+                                    |> updater captcha
+                                    |> InvalidCaptchas
+                                    |> Just
+                            , label = text label
+                            }
+              , width = shrink
+              }
+            ]
+        }
 
 
 table : List (Attribute msg) -> { data : List record, columns : List (Column record msg) } -> Element msg

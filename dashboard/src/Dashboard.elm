@@ -239,9 +239,15 @@ viewOnMap model =
             , columns =
                 [ tableColumnText "Country" .country
                 , tableColumnText "Location" .location
+                , tableColumnText "Found?" (found model)
                 ]
             }
     }
+
+
+found : Model -> Input -> String
+found model { country, location } =
+    "TODO"
 
 
 httpErrorToString : Http.Error -> String
@@ -484,8 +490,7 @@ update msg model =
                         | indexData = Success result
                     }
 
-                cmds : List (Cmd Msg)
-                cmds =
+                countries =
                     model.inputs
                         |> List.map
                             (.country
@@ -493,9 +498,20 @@ update msg model =
                             )
                         |> Set.fromList
                         |> Set.toList
+
+                cmds : List (Cmd Msg)
+                cmds =
+                    countries
                         |> List.map (loadCountry newModel)
             in
-            ( newModel, Cmd.batch cmds )
+            ( { newModel
+                | geoJsonData =
+                    countries
+                        |> List.map (\country -> ( country, Loading ))
+                        |> Dict.fromList
+              }
+            , Cmd.batch cmds
+            )
 
         GotGeoJson country result ->
             ( { model

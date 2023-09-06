@@ -679,7 +679,7 @@ loadCountry model country =
                                     }
                             )
                         |> Task.sequence
-                        |> Task.map List.concat
+                        |> Task.map (List.concat >> List.reverse)
                         |> Task.attempt (GotGeoJson country << Result.mapError Just)
 
         _ ->

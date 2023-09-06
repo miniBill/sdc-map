@@ -6,6 +6,7 @@ import Dashboard
 import Element exposing (Element, el, paragraph, text)
 import Element.Input as Input
 import Flate
+import Html.Attributes
 import Serialize
 import Theme
 import Types exposing (Input)
@@ -44,7 +45,7 @@ view model =
     case model of
         WaitingInput { input, error } ->
             Theme.column [ Theme.padding ]
-                [ Input.text []
+                [ Input.text [ Element.htmlAttribute <| Html.Attributes.autofocus True ]
                     { label = Input.labelHidden "Server data"
                     , text = input
                     , onChange = Input

@@ -7,23 +7,19 @@ import Element exposing (Element, el, paragraph, text)
 import Element.Input as Input
 import Flate
 import Serialize
-import Set exposing (Set)
 import Theme
 import Types exposing (Input)
 
 
 type Model
     = WaitingInput { input : String, error : Maybe String }
-    | Ready
-        { inputs : List Input
-        , invalidCaptchas : Set String
-        }
+    | Dashboard Dashboard.Model
 
 
 type Msg
     = Input String
     | Load
-    | InvalidCaptchas (Set String)
+    | DashboardMsg Dashboard.Model
 
 
 main : Program () Model Msg
@@ -65,10 +61,10 @@ view model =
                             [ text <| "Error: " ++ e ]
                 ]
 
-        Ready { invalidCaptchas, inputs } ->
-            el [ Theme.padding ] <|
-                Element.map InvalidCaptchas <|
-                    Dashboard.view invalidCaptchas inputs
+        Dashboard dashboardModel ->
+            Dashboard.view dashboardModel
+                |> Element.map DashboardMsg
+                |> el [ Theme.padding ]
 
 
 update : Msg -> Model -> Model
@@ -97,10 +93,7 @@ update msg model =
                         )
             of
                 Ok inputs ->
-                    Ready
-                        { inputs = inputs
-                        , invalidCaptchas = Set.empty
-                        }
+                    Dashboard (Dashboard.init inputs)
 
                 Err e ->
                     WaitingInput
@@ -108,16 +101,16 @@ update msg model =
                         , error = Just e
                         }
 
-        ( InvalidCaptchas _, WaitingInput _ ) ->
+        ( DashboardMsg _, WaitingInput _ ) ->
             model
 
-        ( InvalidCaptchas invalidCaptchas, Ready ready ) ->
-            Ready { ready | invalidCaptchas = invalidCaptchas }
+        ( DashboardMsg submsg, Dashboard submodel ) ->
+            Dashboard (Dashboard.update submsg submodel)
 
-        ( Input _, Ready _ ) ->
+        ( Input _, Dashboard _ ) ->
             model
 
-        ( Load, Ready _ ) ->
+        ( Load, Dashboard _ ) ->
             model
 
 

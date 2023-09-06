@@ -1,4 +1,4 @@
-module Dashboard exposing (view)
+module Dashboard exposing (Model, Msg, init, update, view)
 
 import Element exposing (Column, Element, alignTop, centerY, el, fill, px, row, shrink, text, width)
 import Element.Border as Border
@@ -10,50 +10,74 @@ import Theme
 import Types exposing (Input)
 
 
-view : Set String -> List Input -> Element (Set String)
-view invalidCaptchas inputs =
-    let
-        validInputs : List Input
-        validInputs =
-            inputs
-                |> List.filter (\{ captcha } -> not (Set.member captcha invalidCaptchas))
-    in
+type alias Msg =
+    Model
+
+
+type alias Model =
+    { invalidCaptchas : Set String
+    , inputs : List Input
+    }
+
+
+view : Model -> Element Msg
+view model =
     row [ Theme.spacing, width fill ]
         [ Theme.column
             [ width fill
             , alignTop
             ]
-            [ card "On map"
-                { data =
-                    validInputs
-                        |> List.filter (\{ nameOnMap } -> nameOnMap == Just True)
-                , columns =
-                    [ tableColumn "Name" .name
-                    , tableColumn "Country" .country
-                    , tableColumn "Location" .location
-                    ]
-                , pie = Nothing
-                }
-            , card "Statistics by country"
-                { data =
-                    validInputs
-                        |> List.Extra.gatherEqualsBy (\{ country } -> country)
-                        |> List.map
-                            (\( { country }, rest ) ->
-                                { country = country
-                                , count = List.length rest + 1
-                                }
-                            )
-                        |> List.sortBy (\{ count } -> -count)
-                , columns =
-                    [ tableColumn "Country" .country
-                    , tableColumn "Count" <| \{ count } -> String.fromInt count
-                    ]
-                , pie = Just <| \{ country, count } -> ( country, toFloat count )
-                }
+            [ viewOnMap model
+            , viewByCountry model
             ]
-        , viewCaptchas invalidCaptchas inputs
+        , viewCaptchas model
         ]
+
+
+validInputs : Model -> List Input
+validInputs model =
+    model.inputs
+        |> List.filter (\{ captcha } -> not (Set.member captcha model.invalidCaptchas))
+
+
+viewOnMap : Model -> Element Msg
+viewOnMap model =
+    card "On map"
+        { data =
+            validInputs model
+                |> List.filter
+                    (\{ nameOnMap } ->
+                        (nameOnMap == Just True)
+                    )
+        , columns =
+            [ tableColumn "Name" .name
+            , tableColumn "Country" .country
+            , tableColumn "Location" .location
+            ]
+        , pie = Nothing
+        }
+
+
+viewByCountry : Model -> Element Msg
+viewByCountry model =
+    card "Statistics by country"
+        { data =
+            model
+                |> validInputs
+                |> List.Extra.gatherEqualsBy (\{ country } -> country)
+                |> List.map
+                    (\( { country }, rest ) ->
+                        { country = country
+                        , count = List.length rest + 1
+                        }
+                    )
+                |> List.sortBy (\{ count } -> -count)
+        , columns =
+            [ tableColumn "Country" .country
+            , tableColumn "Count" <| \{ count } -> String.fromInt count
+            ]
+        , pie = Just <| \{ country, count } -> ( country, toFloat count )
+        }
 
 
 tableColumn : String -> (element -> String) -> Column element msg
@@ -64,8 +88,8 @@ tableColumn header toCell =
     }
 
 
-viewCaptchas : Set String -> List Input -> Element (Set String)
-viewCaptchas invalidCaptchas inputs =
+viewCaptchas : Model -> Element Msg
+viewCaptchas ({ invalidCaptchas, inputs } as model) =
     card "Captchas"
         { data =
             inputs
@@ -92,7 +116,7 @@ viewCaptchas invalidCaptchas inputs =
                                     ( "Yes", Set.insert )
                         in
                         Theme.button []
-                            { onPress = Just <| updater captcha invalidCaptchas
+                            { onPress = Just { model | invalidCaptchas = updater captcha invalidCaptchas }
                             , label = text label
                             }
               , width = shrink
@@ -134,3 +158,15 @@ card label { data, columns, pie } =
                     |> Element.html
                     |> el [ width <| px 500 ]
         ]
+
+
+init : List Input -> Model
+init inputs =
+    { inputs = inputs
+    , invalidCaptchas = Set.empty
+    }
+
+
+update : Msg -> Model -> Model
+update msg _ =
+    msg

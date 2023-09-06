@@ -1,21 +1,21 @@
 module Frontend exposing (app)
 
 import AppUrl exposing (AppUrl)
+import Base64
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation
-import Codec exposing (Codec)
-import Dashboard
 import Dict
 import Element exposing (Element, centerX, el, fill, height, paddingEach, paragraph, rgb255, shrink, text, width)
 import Element.Background as Background
 import Element.Font as Font
 import Element.Input as Input
 import Env
+import Flate
 import Html
 import Html.Attributes
 import Lamdera exposing (Url)
 import PkgPorts
-import Set
+import Serialize
 import Subdivisions
 import Theme
 import Types exposing (EncryptedString(..), FrontendModel(..), FrontendMsg(..), Input, ToBackend(..), ToFrontend(..))
@@ -41,6 +41,7 @@ app =
                         [ width fill
                         , height fill
                         , Theme.padding
+                        , Font.family [ Font.typeface "Papyrus" ]
                         , Background.color <| rgb255 0xC0 0xBD 0xB6
                         , Font.color <| rgb255 0x27 0x28 0x1A
                         ]
@@ -127,8 +128,15 @@ view model =
                     }
                 ]
 
-        AdminDecrypted captchas inputs ->
-            Dashboard.view captchas inputs
+        AdminDecrypted inputs ->
+            inputs
+                |> Serialize.encodeToBytes (Serialize.list Types.inputCodec)
+                |> Flate.deflate
+                |> Base64.fromBytes
+                |> Maybe.withDefault "<failed>"
+                |> text
+                |> List.singleton
+                |> paragraph []
 
         Filling input maybeError ->
             Theme.column
@@ -385,16 +393,7 @@ update msg model =
         ( Decrypted inputs, _ ) ->
             ( inputs
                 |> List.filterMap decodeInput
-                |> AdminDecrypted Set.empty
-            , Cmd.none
-            )
-
-        ( CaptchaIsValid captcha valid, AdminDecrypted invalidCaptchas inputs ) ->
-            ( if valid then
-                AdminDecrypted (Set.remove captcha invalidCaptchas) inputs
-
-              else
-                AdminDecrypted (Set.insert captcha invalidCaptchas) inputs
+                |> AdminDecrypted
             , Cmd.none
             )
 
@@ -404,12 +403,12 @@ update msg model =
 
 encodeInput : Input -> String
 encodeInput input =
-    Codec.encodeToString 0 inputCodec input
+    Serialize.encodeToString Types.inputCodec input
 
 
 decodeInput : String -> Maybe Input
 decodeInput string =
-    Codec.decodeString inputCodec string
+    Serialize.decodeFromString Types.inputCodec string
         |> Result.toMaybe
         |> Maybe.map
             (\input ->
@@ -421,27 +420,6 @@ decodeInput string =
                     , captcha = String.toLower input.captcha
                 }
             )
-
-
-inputCodec : Codec Input
-inputCodec =
-    Codec.object
-        (\name country location nameOnMap id captcha ->
-            { name = name
-            , country = country
-            , location = location
-            , nameOnMap = nameOnMap
-            , id = id
-            , captcha = captcha
-            }
-        )
-        |> Codec.field "name" .name Codec.string
-        |> Codec.field "country" .country Codec.string
-        |> Codec.field "location" .location Codec.string
-        |> Codec.maybeField "name_on_map" .nameOnMap Codec.bool
-        |> Codec.field "id" .id Codec.string
-        |> Codec.field "captcha" .captcha Codec.string
-        |> Codec.buildObject
 
 
 subscriptions : FrontendModel -> Sub FrontendMsg

@@ -7,23 +7,16 @@ import List.Extra
 import Pie
 import Set exposing (Set)
 import Theme
-import Types exposing (FrontendMsg(..), Input)
+import Types exposing (Input)
 
 
-view : Set String -> List Input -> Element FrontendMsg
+view : Set String -> List Input -> Element (Set String)
 view invalidCaptchas inputs =
     let
         validInputs : List Input
         validInputs =
             inputs
                 |> List.filter (\{ captcha } -> not (Set.member captcha invalidCaptchas))
-
-        column : String -> (element -> String) -> Column element msg
-        column header toCell =
-            { header = el [ Font.bold ] <| text header
-            , view = \row -> el [ centerY ] <| text (toCell row)
-            , width = shrink
-            }
     in
     Theme.row [ width fill ]
         [ Theme.column
@@ -35,9 +28,9 @@ view invalidCaptchas inputs =
                     validInputs
                         |> List.filter (\{ nameOnMap } -> nameOnMap == Just True)
                 , columns =
-                    [ column "Name" .name
-                    , column "Country" .country
-                    , column "Location" .location
+                    [ tableColumn "Name" .name
+                    , tableColumn "Country" .country
+                    , tableColumn "Location" .location
                     ]
                 , pie = Nothing
                 }
@@ -53,49 +46,60 @@ view invalidCaptchas inputs =
                             )
                         |> List.sortBy (\{ count } -> -count)
                 , columns =
-                    [ column "Country" .country
-                    , column "Count" <| \{ count } -> String.fromInt count
+                    [ tableColumn "Country" .country
+                    , tableColumn "Count" <| \{ count } -> String.fromInt count
                     ]
                 , pie = Just <| \{ country, count } -> ( country, toFloat count )
                 }
             ]
-        , card "Captchas"
-            { data =
-                inputs
-                    |> List.Extra.gatherEqualsBy (\{ captcha } -> captcha)
-                    |> List.map
-                        (\( { captcha }, rest ) ->
-                            { captcha = captcha
-                            , count = List.length rest + 1
-                            }
-                        )
-                    |> List.sortBy (\{ count } -> -count)
-            , columns =
-                [ column "Captcha" .captcha
-                , column "Count" <| \{ count } -> String.fromInt count
-                , { header = el [ Font.bold ] <| text "Is valid"
-                  , view =
-                        \{ captcha } ->
-                            let
-                                invalid : Bool
-                                invalid =
-                                    Set.member captcha invalidCaptchas
-                            in
-                            Theme.button []
-                                { onPress = Just <| CaptchaIsValid captcha invalid
-                                , label =
-                                    if invalid then
-                                        text "No"
-
-                                    else
-                                        text "Yes"
-                                }
-                  , width = shrink
-                  }
-                ]
-            , pie = Nothing
-            }
+        , viewCaptchas invalidCaptchas inputs
         ]
+
+
+tableColumn : String -> (element -> String) -> Column element msg
+tableColumn header toCell =
+    { header = el [ Font.bold ] <| text header
+    , view = \row -> el [ centerY ] <| text (toCell row)
+    , width = shrink
+    }
+
+
+viewCaptchas : Set String -> List Input -> Element (Set String)
+viewCaptchas invalidCaptchas inputs =
+    card "Captchas"
+        { data =
+            inputs
+                |> List.Extra.gatherEqualsBy (\{ captcha } -> captcha)
+                |> List.map
+                    (\( { captcha }, rest ) ->
+                        { captcha = captcha
+                        , count = List.length rest + 1
+                        }
+                    )
+                |> List.sortBy (\{ count } -> -count)
+        , columns =
+            [ tableColumn "Captcha" .captcha
+            , tableColumn "Count" <| \{ count } -> String.fromInt count
+            , { header = el [ Font.bold ] <| text "Is valid"
+              , view =
+                    \{ captcha } ->
+                        let
+                            ( label, updater ) =
+                                if Set.member captcha invalidCaptchas then
+                                    ( "No", Set.remove )
+
+                                else
+                                    ( "Yes", Set.insert )
+                        in
+                        Theme.button []
+                            { onPress = Just <| updater captcha invalidCaptchas
+                            , label = text label
+                            }
+              , width = shrink
+              }
+            ]
+        , pie = Nothing
+        }
 
 
 card :

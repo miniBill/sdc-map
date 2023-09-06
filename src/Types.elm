@@ -1,8 +1,8 @@
-module Types exposing (BackendModel, BackendMsg, EncryptedString(..), Error, FrontendModel(..), FrontendMsg(..), Input, ToBackend(..), ToFrontend(..))
+module Types exposing (BackendModel, BackendMsg, EncryptedString(..), Error, FrontendModel(..), FrontendMsg(..), Input, ToBackend(..), ToFrontend(..), inputCodec)
 
 import Dict exposing (Dict)
 import Random
-import Set exposing (Set)
+import Serialize exposing (Codec)
 
 
 type alias BackendModel =
@@ -27,7 +27,7 @@ type FrontendModel
     | Submitting Input
     | Submitted { id : String, input : Input }
     | AdminDecrypting String (Dict String EncryptedString)
-    | AdminDecrypted (Set String) (List Input)
+    | AdminDecrypted (List Input)
 
 
 type alias Input =
@@ -68,3 +68,24 @@ type EncryptedString
 
 type alias BackendMsg =
     {}
+
+
+inputCodec : Codec e Input
+inputCodec =
+    Serialize.record
+        (\name country location nameOnMap id captcha ->
+            { name = name
+            , country = country
+            , location = location
+            , nameOnMap = nameOnMap
+            , id = id
+            , captcha = captcha
+            }
+        )
+        |> Serialize.field .name Serialize.string
+        |> Serialize.field .country Serialize.string
+        |> Serialize.field .location Serialize.string
+        |> Serialize.field .nameOnMap (Serialize.maybe Serialize.bool)
+        |> Serialize.field .id Serialize.string
+        |> Serialize.field .captcha Serialize.string
+        |> Serialize.finishRecord

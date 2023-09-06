@@ -18,14 +18,15 @@ import Types exposing (Input)
 
 type Msg
     = InvalidCaptchas (Set String)
-    | GotIndexData (Result Http.Error (Dict String { threeLetterCode : String, level : Int }))
+    | GotIndexData (Result Http.Error (Dict Country { threeLetterCode : String, level : Int }))
+    | GotGeoJson Country (Result (Maybe Http.Error) GeoJson)
 
 
 type alias Model =
     { invalidCaptchas : Set String
     , inputs : List Input
     , indexData : WebData (Dict String { threeLetterCode : String, level : Int })
-    , loadedGeoJsonData : Dict Country GeoJson
+    , geoJsonData : Dict Country (RemoteData (Maybe Http.Error) GeoJson)
     }
 
 
@@ -33,7 +34,7 @@ init : List Input -> ( Model, Cmd Msg )
 init inputs =
     ( { inputs = inputs
       , invalidCaptchas = Set.empty
-      , loadedGeoJsonData = Dict.empty
+      , geoJsonData = Dict.empty
       , indexData = Loading
       }
     , Http.get
@@ -121,7 +122,49 @@ viewOnMap model =
 
             Success _ ->
                 text "Loaded index data."
+        , table []
+            { data = Dict.toList model.geoJsonData
+            , columns =
+                [ tableColumnText "Country" Tuple.first
+                , tableColumnText "Status" <|
+                    \( _, geoJson ) ->
+                        case geoJson of
+                            Failure (Just e) ->
+                                httpErrorToString e
+
+                            Failure Nothing ->
+                                "Not found in index"
+
+                            NotAsked ->
+                                "Not asked???"
+
+                            Loading ->
+                                "Loading..."
+
+                            Success _ ->
+                                "Loaded"
+                ]
+            }
         ]
+
+
+httpErrorToString : Http.Error -> String
+httpErrorToString error =
+    case error of
+        Http.BadUrl url ->
+            "BadUrl " ++ url
+
+        Http.Timeout ->
+            "Timeout"
+
+        Http.NetworkError ->
+            "NetworkError"
+
+        Http.BadStatus status ->
+            "BadStatus " ++ String.fromInt status
+
+        Http.BadBody errorMessage ->
+            "BadBody " ++ errorMessage
 
 
 viewByCountry : Model -> Element Msg
@@ -330,11 +373,51 @@ card label children =
         ]
 
 
-update : Msg -> Model -> ( Model, Cmd msg )
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         InvalidCaptchas invalidCaptchas ->
             ( { model | invalidCaptchas = invalidCaptchas }, Cmd.none )
 
-        GotIndexData result ->
-            ( { model | indexData = RemoteData.fromResult result }, Cmd.none )
+        GotIndexData (Err e) ->
+            ( { model | indexData = Failure e }, Cmd.none )
+
+        GotIndexData (Ok result) ->
+            let
+                ( countries, cmds ) =
+                    model.inputs
+                        |> List.map .country
+                        |> Set.fromList
+                        |> Set.toList
+                        |> List.map
+                            (\country ->
+                                case Dict.get country result of
+                                    Nothing ->
+                                        ( ( country, Failure Nothing ), Cmd.none )
+
+                                    Just { threeLetterCode, level } ->
+                                        ( ( country, Loading )
+                                        , Http.get
+                                            { url = "/geodata/gadm41_" ++ threeLetterCode ++ "_" ++ String.fromInt (level - 2) ++ ".json"
+                                            , expect =
+                                                Http.expectJson
+                                                    (GotGeoJson country << Result.mapError Just)
+                                                    GeoJson.decoder
+                                            }
+                                        )
+                            )
+                        |> List.unzip
+            in
+            ( { model
+                | indexData = Success result
+                , geoJsonData = Dict.fromList countries
+              }
+            , Cmd.batch cmds
+            )
+
+        GotGeoJson country result ->
+            ( { model
+                | geoJsonData = Dict.insert country (RemoteData.fromResult result) model.geoJsonData
+              }
+            , Cmd.none
+            )

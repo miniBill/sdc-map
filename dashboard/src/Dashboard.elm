@@ -6,6 +6,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import GeoJson exposing (GeoJsonObject(..), Geometry(..), Position)
+import Html.Attributes
 import Http
 import Http.Tasks
 import Json.Decode exposing (Decoder)
@@ -17,6 +18,9 @@ import Round
 import Set exposing (Set)
 import Task
 import Theme
+import TypedSvg as Svg
+import TypedSvg.Attributes as SAttrs
+import TypedSvg.Types as STypes
 import Types exposing (Input)
 
 
@@ -137,7 +141,7 @@ type alias Country =
 view : Model -> Element Msg
 view model =
     let
-        { onMap, geoData, locations } =
+        { onMap, geoData, locations, map } =
             viewOnMap model
     in
     [ card "Statistics by country" <| viewByCountry model
@@ -147,6 +151,7 @@ view model =
         ]
     , card "On map" onMap
     , card "Locations" locations
+    , card "Map" map
     ]
         |> wrappedRow [ Theme.spacing ]
 
@@ -163,6 +168,7 @@ viewOnMap :
         { onMap : Element msg
         , geoData : Element Msg
         , locations : Element msg
+        , map : Element msg
         }
 viewOnMap model =
     let
@@ -203,6 +209,13 @@ viewOnMap model =
                                 Nothing
                     )
                 |> List.concat
+
+        locations : List Input
+        locations =
+            filteredInputs
+                |> List.Extra.gatherEqualsBy (\{ country, location } -> ( country, location ))
+                |> List.map Tuple.first
+                |> List.sortBy (\{ country, location } -> ( country, location ))
     in
     { onMap =
         table [ alignTop ]
@@ -284,32 +297,184 @@ viewOnMap model =
             ]
     , locations =
         table []
-            { data =
-                filteredInputs
-                    |> List.Extra.gatherEqualsBy (\{ country, location } -> ( country, location ))
-                    |> List.map Tuple.first
-                    |> List.sortBy (\{ country, location } -> ( country, location ))
+            { data = locations
             , columns =
                 [ tableColumnText "Country" .country
                 , tableColumnText "Location" .location
                 , tableColumnText "Found?"
                     (\input ->
                         case findPosition model input of
-                            Ok ( lat, lon, alt ) ->
-                                "("
-                                    ++ Round.round 4 lat
-                                    ++ ", "
-                                    ++ Round.round 4 lon
-                                    ++ ", "
-                                    ++ Round.round 4 alt
-                                    ++ ")"
+                            Ok ( lon, lat, alt ) ->
+                                let
+                                    i : String
+                                    i =
+                                        [ lon, lat, alt ]
+                                            |> List.map (Round.round 4)
+                                            |> String.join ", "
+                                in
+                                "(" ++ i ++ ")"
 
                             Err e ->
                                 "Err: " ++ e
                     )
                 ]
             }
+    , map =
+        let
+            east : Float
+            east =
+                Tuple.first <| winkelTripel ( 180, 0, 0 )
+
+            north : Float
+            north =
+                Tuple.second <| winkelTripel ( 0, 90, 0 )
+
+            svgWidth : number
+            svgWidth =
+                400
+
+            coords : List ( Float, Float )
+            coords =
+                locations
+                    |> List.filterMap
+                        (\input ->
+                            findPosition model input
+                                |> Result.toMaybe
+                                |> Maybe.map winkelTripel
+                        )
+
+            ( xs, ys ) =
+                List.unzip coords
+
+            rawMinx : Float
+            rawMinx =
+                List.minimum xs
+                    |> Maybe.withDefault -east
+
+            rawMaxx : Float
+            rawMaxx =
+                List.maximum xs
+                    |> Maybe.withDefault east
+
+            rawMiny : Float
+            rawMiny =
+                List.minimum ys
+                    |> Maybe.withDefault -north
+
+            rawMaxy : Float
+            rawMaxy =
+                List.maximum ys
+                    |> Maybe.withDefault north
+
+            expand : Float -> Float -> Float -> ( Float, Float )
+            expand rawMin rawMax ceil =
+                let
+                    w : Float
+                    w =
+                        rawMax - rawMin
+                in
+                ( max -ceil <| rawMin - 0.3 * w
+                , min ceil <| rawMax + 0.3 * w
+                )
+
+            ( minx, maxx ) =
+                expand rawMinx rawMaxx east
+
+            ( miny, maxy ) =
+                expand rawMiny rawMaxy north
+
+            vwidth : Float
+            vwidth =
+                maxx - minx
+
+            vheight : Float
+            vheight =
+                maxy - miny
+
+            svgRatio : Float
+            svgRatio =
+                vwidth / vheight
+        in
+        coords
+            |> List.map
+                (\( x, y ) ->
+                    Svg.circle
+                        [ SAttrs.cx (STypes.px x)
+                        , SAttrs.cy (STypes.px -y)
+                        , SAttrs.r (STypes.px 0.005)
+                        ]
+                        []
+                )
+            |> (::)
+                (let
+                    winkelWidth : Float
+                    winkelWidth =
+                        2 * east
+
+                    imageWidth =
+                        2058
+
+                    imageHeight =
+                        1262
+
+                    imageRatio =
+                        imageWidth / imageHeight
+
+                    height : Float
+                    height =
+                        winkelWidth / imageRatio
+                 in
+                 Svg.image
+                    [ SAttrs.href "world.jpg"
+                    , SAttrs.width (STypes.px winkelWidth)
+                    , SAttrs.height (STypes.px height)
+                    , SAttrs.x (STypes.px -east)
+                    , SAttrs.y (STypes.px <| -height / 2)
+                    ]
+                    []
+                )
+            |> Svg.svg
+                [ Html.Attributes.height (round <| svgWidth / svgRatio)
+                , Html.Attributes.width svgWidth
+                , SAttrs.viewBox minx -maxy vwidth vheight
+
+                -- , SAttrs.viewBox west south winkelWidth winkelHeight
+                ]
+            |> Element.html
     }
+
+
+winkelTripel : Position -> ( Float, Float )
+winkelTripel ( long, lat, _ ) =
+    let
+        lambda =
+            degrees long
+
+        phi =
+            degrees lat
+
+        alpha =
+            acos (cos phi * cos (lambda / 2))
+
+        phi_1 =
+            acos (2 / pi)
+
+        x =
+            0.5 * (lambda * cos phi_1 + 2 * (cos phi * sin (lambda / 2)) / sinc alpha)
+
+        y =
+            0.5 * (phi + sin phi / sinc alpha)
+    in
+    ( x, y )
+
+
+sinc : Float -> Float
+sinc x =
+    if x == 0 then
+        1
+
+    else
+        sin x / x
 
 
 findPosition : Model -> Input -> Result String Position
@@ -428,6 +593,14 @@ viewByCountry model =
         ]
 
 
+tableColumnElement : String -> (element -> Element msg) -> Column element msg
+tableColumnElement headerLabel toCell =
+    { header = text headerLabel
+    , view = \row -> el [ centerY ] <| toCell row
+    , width = shrink
+    }
+
+
 tableColumnNumber : String -> (element -> Int) -> Column element msg
 tableColumnNumber headerLabel toCell =
     { header = text headerLabel
@@ -438,10 +611,8 @@ tableColumnNumber headerLabel toCell =
 
 tableColumnText : String -> (element -> String) -> Column element msg
 tableColumnText headerLabel toCell =
-    { header = text headerLabel
-    , view = \row -> el [ centerY ] <| text <| toCell row
-    , width = shrink
-    }
+    tableColumnElement headerLabel
+        (\row -> text <| toCell row)
 
 
 viewCaptchas : Model -> Element Msg

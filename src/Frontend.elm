@@ -447,7 +447,7 @@ viewInput input =
                     { top = 0
                     , left = 0
                     , right = 0
-                    , bottom = Theme.rythm // 2
+                    , bottom = Theme.rythm
                     }
                 ]
             <|

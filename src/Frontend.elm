@@ -245,7 +245,7 @@ type alias Paragraph =
 
 viewDocument : LegalDocument -> Element msg
 viewDocument doc =
-    column [ width fill, spacing 30 ]
+    column [ centerX, spacing 30 ]
         ([ textColumn [ width fill, Theme.spacing ]
             [ el
                 [ Font.center

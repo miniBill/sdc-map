@@ -66,8 +66,8 @@ app =
 footer : Element msg
 footer =
     Theme.row [ centerX, alignBottom ]
-        [ link [] { url = "/privacy", label = text "🕵️ Privacy policy" }
-        , link [] { url = "/cookies", label = text "🍪 Cookie policy" }
+        [ link [] { url = "/privacy", label = text "🕵️ Privacy Policy" }
+        , link [] { url = "/cookies", label = text "🍪 Cookie Policy" }
         ]
 
 
@@ -228,7 +228,7 @@ view model =
 type alias LegalDocument =
     { title : String
     , lastUpdated : Date
-    , intro : Paragraph
+    , intro : List Paragraph
     , sections : List Section
     }
 
@@ -250,7 +250,7 @@ viewDocument doc =
             [ el
                 [ Font.center
                 , Font.bold
-                , Font.size 30
+                , Font.size 36
                 ]
                 (text doc.title)
             , el [ Font.semiBold ] <|
@@ -258,7 +258,7 @@ viewDocument doc =
                     "Last updated: "
                         ++ Date.toIsoString doc.lastUpdated
             ]
-         , textColumn [] [ viewParagraph doc.intro ]
+         , textColumn [] <| List.map viewParagraph doc.intro
          ]
             ++ List.map viewSection doc.sections
         )
@@ -269,7 +269,7 @@ viewSection { title, paragraphs } =
     textColumn [ Theme.spacing ] <|
         el
             [ Font.bold
-            , Font.size 24
+            , Font.size 28
             ]
             (text title)
             :: List.map viewParagraph paragraphs
@@ -292,7 +292,7 @@ cookiesDocument : LegalDocument
 cookiesDocument =
     { title = "Cookie Policy"
     , lastUpdated = Date.fromCalendarDate 2023 Sep 7
-    , intro = [ text "This Cookie Policy explains: what cookies are, why this website uses cookies, and what you can do about it." ]
+    , intro = [ [ text "This Cookie Policy explains: what cookies are, why this website uses cookies, and what you can do about it." ] ]
     , sections =
         [ { title = "Oh Cookie, Cookie, wherefore art thou a Cookie?"
           , paragraphs =
@@ -328,10 +328,109 @@ cookiesDocument =
 
 privacyDocument : LegalDocument
 privacyDocument =
+    let
+        emailLink : Element msg
+        emailLink =
+            link_ "leonardo@taglialegne.it" "mailto:leonardo@taglialegne.it?subject=SDC%20map%20project"
+
+        term : String -> Element msg
+        term content =
+            el [ Theme.style "font-variant" "small-caps" ] (text content)
+
+        point : String -> List (Element msg) -> List (Element msg)
+        point label content =
+            el [ Font.bold ] (text label) :: text " " :: content
+
+        visibility : String -> Element msg
+        visibility content =
+            el [ Theme.style "font-variant" "small-caps", Font.semiBold ] (text content)
+
+        point_ : String -> String -> List (Element msg)
+        point_ label content =
+            point label [ text content ]
+    in
     { title = "Privacy Policy"
     , lastUpdated = Date.fromCalendarDate 2023 Sep 7
-    , intro = []
-    , sections = []
+    , intro =
+        [ [ text "This Privacy Policy describes how and why the SDC map project collects, stores, uses and shares your information." ]
+        , [ text "For any questions or concerns, contact me at ", emailLink, text "." ]
+        ]
+    , sections =
+        [ { title = "Summary"
+          , paragraphs =
+                [ [ text "This is a summary, all the points are expanded on below" ]
+                , point_ "What information is handled?" "The only information handled are the replies given to the survey."
+                , point_ "Do we handle sensitive personal information?" "No."
+                , point_ "Do we send or receive information from/to third parties?" "We only share publicly what you explicitly chose to share."
+                , point_ "How do we process your information?" "The information is stored in encrypted form and only used according to your explicit choice."
+                , point_ "What are your rights?" "You can ask for your information to be updated or deleted."
+                , point "How do you excercise your rights?"
+                    [ text "Contact me at "
+                    , emailLink
+                    , text " or on "
+                    , link_ "Discord" "https://discordapp.com/users/397675122267521034"
+                    , text ", "
+                    , link_ "Xwitter™" "https://twitter.com/miniBill"
+                    , text ", "
+                    , link_ "Telegram" "https://t.me/miniBill"
+                    , text ", Signal, or even regular mail if you already know my address. Please refrain from using Pidgeon Post."
+                    ]
+                ]
+          }
+        , { title = "What information is handled"
+          , paragraphs =
+                [ [ text "In short: your replies to the survey. In more details this is how each field is handled:" ]
+                , point "Name:"
+                    [ text "If you select to "
+                    , term "show your name on the map"
+                    , text " this is the name that is used, and is thus "
+                    , visibility "public"
+                    , text ". If you select to "
+                    , term "only use your data for statistics"
+                    , text " then this is only used for data deletion and update request and is thus "
+                    , visibility "private"
+                    , text "."
+                    ]
+                , point "Country:"
+                    [ text "If you select to "
+                    , term "show your name on the map"
+                    , text " this is used to place your marker on the map, and is thus "
+                    , visibility "public"
+                    , text ". If you select to "
+                    , term "only use your data for statistics"
+                    , text " then this is used for showing how many people come from each country and is thus "
+                    , visibility "public - in aggregate form only"
+                    , text "."
+                    ]
+                , point "Location:"
+                    [ text "If you select to "
+                    , term "show your name on the map"
+                    , text " this is used to place your marker on the map, and is thus "
+                    , visibility "public"
+                    , text ". If you select to "
+                    , term "only use your data for statistics"
+                    , text " then this is not used and is thus "
+                    , visibility "private"
+                    , text ". In fact, you should avoid filling it in if you select that option."
+                    ]
+                , point_ "Show name on map:" "This is what determines how your data is used."
+                , point "Contact"
+                    [ text "This is only used for data deletion and update request and is thus "
+                    , visibility "private"
+                    , text "."
+                    ]
+                , point "Anti-bot"
+                    [ text "This is only used for spam prevention and is thus "
+                    , visibility "private"
+                    , text "."
+                    ]
+                , [ text "In addition, your data is associated with a random ID that you get told after filling in the data. That ID is only used for data deletion and update request and is thus "
+                  , visibility "private"
+                  , text "."
+                  ]
+                ]
+          }
+        ]
     }
 
 

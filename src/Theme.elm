@@ -1,8 +1,9 @@
-module Theme exposing (button, column, padding, row, rythm, spacing)
+module Theme exposing (button, column, padding, row, rythm, spacing, style)
 
 import Element exposing (Attribute, Element)
 import Element.Border as Border
 import Element.Input as Input
+import Html.Attributes
 
 
 padding : Attribute msg
@@ -35,3 +36,8 @@ button attrs config =
     Input.button
         (padding :: Border.width 1 :: attrs)
         config
+
+
+style : String -> String -> Attribute msg
+style key value =
+    Element.htmlAttribute <| Html.Attributes.style key value

@@ -1,11 +1,13 @@
 module Dashboard exposing (Country, Location, Model, Msg, init, update, view)
 
+import Color
 import Dict exposing (Dict)
 import Element exposing (Attribute, Column, Element, alignRight, alignTop, centerX, centerY, el, fill, paragraph, px, rgb, shrink, text, width, wrappedRow)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import GeoJson exposing (GeoJsonObject(..), Geometry(..), Position)
+import Html
 import Html.Attributes
 import Http
 import Http.Tasks
@@ -20,6 +22,7 @@ import Task
 import Theme
 import TypedSvg as Svg
 import TypedSvg.Attributes as SAttrs
+import TypedSvg.Core exposing (Svg)
 import TypedSvg.Types as STypes
 import Types exposing (Input)
 
@@ -44,6 +47,7 @@ type alias Model =
 type alias Location =
     { name : String
     , alternativeNames : List String
+    , geometry : Geometry
     , center : Position
     }
 
@@ -210,11 +214,17 @@ viewOnMap model =
                     )
                 |> List.concat
 
-        locations : List Input
+        locations : List { country : String, location : String, names : List String }
         locations =
             filteredInputs
                 |> List.Extra.gatherEqualsBy (\{ country, location } -> ( country, location ))
-                |> List.map Tuple.first
+                |> List.map
+                    (\( { country, location, name }, others ) ->
+                        { country = country
+                        , location = location
+                        , names = name :: List.map .name others
+                        }
+                    )
                 |> List.sortBy (\{ country, location } -> ( country, location ))
     in
     { onMap =
@@ -304,11 +314,11 @@ viewOnMap model =
                 , tableColumnText "Found?"
                     (\input ->
                         case findPosition model input of
-                            Ok ( lon, lat, alt ) ->
+                            Ok ( lon, lat, _ ) ->
                                 let
                                     i : String
                                     i =
-                                        [ lon, lat, alt ]
+                                        [ lon, lat ]
                                             |> List.map (Round.round 4)
                                             |> String.join ", "
                                 in
@@ -319,129 +329,138 @@ viewOnMap model =
                     )
                 ]
             }
-    , map =
-        let
-            east : Float
-            east =
-                Tuple.first <| winkelTripel ( 180, 0, 0 )
-
-            north : Float
-            north =
-                Tuple.second <| winkelTripel ( 0, 90, 0 )
-
-            svgWidth : number
-            svgWidth =
-                400
-
-            coords : List ( Float, Float )
-            coords =
-                locations
-                    |> List.filterMap
-                        (\input ->
-                            findPosition model input
-                                |> Result.toMaybe
-                                |> Maybe.map winkelTripel
-                        )
-
-            ( xs, ys ) =
-                List.unzip coords
-
-            rawMinx : Float
-            rawMinx =
-                List.minimum xs
-                    |> Maybe.withDefault -east
-
-            rawMaxx : Float
-            rawMaxx =
-                List.maximum xs
-                    |> Maybe.withDefault east
-
-            rawMiny : Float
-            rawMiny =
-                List.minimum ys
-                    |> Maybe.withDefault -north
-
-            rawMaxy : Float
-            rawMaxy =
-                List.maximum ys
-                    |> Maybe.withDefault north
-
-            expand : Float -> Float -> Float -> ( Float, Float )
-            expand rawMin rawMax ceil =
-                let
-                    w : Float
-                    w =
-                        rawMax - rawMin
-                in
-                ( max -ceil <| rawMin - 0.3 * w
-                , min ceil <| rawMax + 0.3 * w
-                )
-
-            ( minx, maxx ) =
-                expand rawMinx rawMaxx east
-
-            ( miny, maxy ) =
-                expand rawMiny rawMaxy north
-
-            vwidth : Float
-            vwidth =
-                maxx - minx
-
-            vheight : Float
-            vheight =
-                maxy - miny
-
-            svgRatio : Float
-            svgRatio =
-                vwidth / vheight
-        in
-        coords
-            |> List.map
-                (\( x, y ) ->
-                    Svg.circle
-                        [ SAttrs.cx (STypes.px x)
-                        , SAttrs.cy (STypes.px -y)
-                        , SAttrs.r (STypes.px 0.005)
-                        ]
-                        []
-                )
-            |> (::)
-                (let
-                    winkelWidth : Float
-                    winkelWidth =
-                        2 * east
-
-                    imageWidth =
-                        2058
-
-                    imageHeight =
-                        1262
-
-                    imageRatio =
-                        imageWidth / imageHeight
-
-                    height : Float
-                    height =
-                        winkelWidth / imageRatio
-                 in
-                 Svg.image
-                    [ SAttrs.href "world.jpg"
-                    , SAttrs.width (STypes.px winkelWidth)
-                    , SAttrs.height (STypes.px height)
-                    , SAttrs.x (STypes.px -east)
-                    , SAttrs.y (STypes.px <| -height / 2)
-                    ]
-                    []
-                )
-            |> Svg.svg
-                [ Html.Attributes.height (round <| svgWidth / svgRatio)
-                , Html.Attributes.width svgWidth
-                , SAttrs.viewBox minx -maxy vwidth vheight
-
-                -- , SAttrs.viewBox west south winkelWidth winkelHeight
-                ]
-            |> Element.html
+    , map = viewMap model locations
     }
+
+
+viewMap : Model -> List { country : String, location : String, names : List String } -> Element msg
+viewMap model locations =
+    let
+        east : Float
+        east =
+            Tuple.first <| winkelTripel ( 180, 0, 0 )
+
+        north : Float
+        north =
+            Tuple.second <| winkelTripel ( 0, 90, 0 )
+
+        svgWidth : number
+        svgWidth =
+            400
+
+        coordsWithNames : List ( ( Float, Float ), List String )
+        coordsWithNames =
+            locations
+                |> List.filterMap
+                    (\input ->
+                        findPosition model input
+                            |> Result.toMaybe
+                            |> Maybe.map winkelTripel
+                            |> Maybe.map (\pos -> ( pos, input.names ))
+                    )
+
+        ( xs, ys ) =
+            coordsWithNames
+                |> List.map (\( pos, _ ) -> pos)
+                |> List.unzip
+
+        rawMinx : Float
+        rawMinx =
+            List.minimum xs
+                |> Maybe.withDefault -east
+
+        rawMaxx : Float
+        rawMaxx =
+            List.maximum xs
+                |> Maybe.withDefault east
+
+        rawMiny : Float
+        rawMiny =
+            List.minimum ys
+                |> Maybe.withDefault -north
+
+        rawMaxy : Float
+        rawMaxy =
+            List.maximum ys
+                |> Maybe.withDefault north
+
+        expand : Float -> Float -> Float -> ( Float, Float )
+        expand rawMin rawMax ceil =
+            let
+                w : Float
+                w =
+                    rawMax - rawMin
+            in
+            ( max -ceil <| rawMin - 0.3 * w
+            , min ceil <| rawMax + 0.3 * w
+            )
+
+        ( minx, maxx ) =
+            expand rawMinx rawMaxx east
+
+        ( miny, maxy ) =
+            expand rawMiny rawMaxy north
+
+        vwidth : Float
+        vwidth =
+            maxx - minx
+
+        vheight : Float
+        vheight =
+            maxy - miny
+
+        svgRatio : Float
+        svgRatio =
+            vwidth / vheight
+
+        winkelWidth : Float
+        winkelWidth =
+            2 * east
+
+        imageWidth =
+            2058
+
+        imageHeight =
+            1262
+
+        imageRatio =
+            imageWidth / imageHeight
+
+        height : Float
+        height =
+            winkelWidth / imageRatio
+
+        background : Svg msg
+        background =
+            Svg.image
+                [ SAttrs.href "world.jpg"
+                , SAttrs.width (STypes.px winkelWidth)
+                , SAttrs.height (STypes.px height)
+                , SAttrs.x (STypes.px -east)
+                , SAttrs.y (STypes.px <| -height / 2)
+                ]
+                []
+
+        viewPoint : ( ( Float, Float ), List String ) -> Svg msg
+        viewPoint ( ( x, y ), names ) =
+            Svg.circle
+                [ SAttrs.cx (STypes.px x)
+                , SAttrs.cy (STypes.px -y)
+                , SAttrs.r (STypes.px 0.005)
+                , SAttrs.fill (STypes.Paint Color.red)
+                ]
+                [ Svg.title [] [ Html.text <| String.join ", " names ] ]
+    in
+    List.map viewPoint coordsWithNames
+        |> (::) background
+        |> Svg.svg
+            [ Html.Attributes.height (round <| svgWidth / svgRatio)
+            , Html.Attributes.width svgWidth
+            , SAttrs.viewBox minx -maxy vwidth vheight
+
+            -- , SAttrs.viewBox west south winkelWidth winkelHeight
+            ]
+        |> Element.html
 
 
 winkelTripel : Position -> ( Float, Float )
@@ -477,7 +496,7 @@ sinc x =
         sin x / x
 
 
-findPosition : Model -> Input -> Result String Position
+findPosition : Model -> { a | country : String, location : String } -> Result String Position
 findPosition model { country, location } =
     if String.isEmpty location then
         case model.capitals of
@@ -894,6 +913,7 @@ geoJsonDecoder =
                                                     else
                                                         String.split "|" varName
                                                 , center = getCentroid geometry
+                                                , geometry = geometry
                                                 }
                                             )
                                             (Json.Decode.decodeValue nameDecoder

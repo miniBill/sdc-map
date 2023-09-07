@@ -1,4 +1,4 @@
-module Theme exposing (button, column, padding, rythm, spacing)
+module Theme exposing (button, column, padding, row, rythm, spacing)
 
 import Element exposing (Attribute, Element)
 import Element.Border as Border
@@ -23,6 +23,11 @@ rythm =
 column : List (Attribute msg) -> List (Element msg) -> Element msg
 column attrs children =
     Element.column (spacing :: attrs) children
+
+
+row : List (Attribute msg) -> List (Element msg) -> Element msg
+row attrs children =
+    Element.row (spacing :: attrs) children
 
 
 button : List (Attribute msg) -> { onPress : Maybe msg, label : Element msg } -> Element msg

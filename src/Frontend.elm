@@ -5,8 +5,9 @@ import Base64
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation
 import Codec
+import Date exposing (Date)
 import Dict
-import Element exposing (Element, centerX, el, fill, height, paddingEach, paragraph, rgb255, shrink, text, width)
+import Element exposing (Element, alignBottom, centerX, column, el, fill, height, link, paddingEach, paragraph, rgb, rgb255, shrink, spacing, text, textColumn, width)
 import Element.Background as Background
 import Element.Font as Font
 import Element.Input as Input
@@ -19,7 +20,9 @@ import PkgPorts
 import Serialize
 import Subdivisions
 import Theme
+import Time exposing (Month(..))
 import Types exposing (EncryptedString(..), FrontendModel(..), FrontendMsg(..), Input, ToBackend(..), ToFrontend(..))
+import Url
 
 
 app :
@@ -45,15 +48,27 @@ app =
                         , Background.color <| rgb255 0xC0 0xBD 0xB6
                         , Font.color <| rgb255 0x27 0x28 0x1A
                         ]
-                        (view flagsModel)
+                        (Theme.column [ width fill, height fill ]
+                            [ view flagsModel
+                            , footer
+                            ]
+                        )
                     ]
                 }
         , update = update
         , subscriptions = subscriptions
         , onUrlChange = \_ -> Nop
-        , onUrlRequest = \_ -> Nop
+        , onUrlRequest = UrlRequested
         , updateFromBackend = updateFromBackend
         }
+
+
+footer : Element msg
+footer =
+    Theme.row [ centerX, alignBottom ]
+        [ link [] { url = "/privacy", label = text "🕵️ Privacy policy" }
+        , link [] { url = "/cookies", label = text "🍪 Cookie policy" }
+        ]
 
 
 updateFromBackend : ToFrontend -> FrontendModel -> ( FrontendModel, Cmd FrontendMsg )
@@ -90,29 +105,43 @@ init url navKey =
                 }
                 Nothing
     in
-    case Dict.get "key" appUrl.queryParameters of
-        Just [ key ] ->
-            ( defaultModel
-            , Cmd.batch
-                [ Lamdera.sendToBackend <| TBAdmin key
-                , case Env.mode of
-                    Env.Production ->
-                        Browser.Navigation.replaceUrl navKey "/admin"
+    case appUrl.path of
+        [ "cookies" ] ->
+            ( Cookies, Cmd.none )
 
-                    Env.Development ->
-                        Cmd.none
-                ]
-            )
+        [ "privacy" ] ->
+            ( Privacy, Cmd.none )
 
         _ ->
-            ( defaultModel
-            , Cmd.none
-            )
+            case Dict.get "key" appUrl.queryParameters of
+                Just [ key ] ->
+                    ( defaultModel
+                    , Cmd.batch
+                        [ Lamdera.sendToBackend <| TBAdmin key
+                        , case Env.mode of
+                            Env.Production ->
+                                Browser.Navigation.replaceUrl navKey "/admin"
+
+                            Env.Development ->
+                                Cmd.none
+                        ]
+                    )
+
+                _ ->
+                    ( defaultModel
+                    , Cmd.none
+                    )
 
 
 view : FrontendModel -> Element FrontendMsg
 view model =
     case model of
+        Privacy ->
+            viewDocument privacyDocument
+
+        Cookies ->
+            viewDocument cookiesDocument
+
         AdminDecrypting key _ ->
             Theme.column []
                 [ Input.currentPassword []
@@ -194,6 +223,116 @@ view model =
                             ++ id
                     ]
                 ]
+
+
+type alias LegalDocument =
+    { title : String
+    , lastUpdated : Date
+    , intro : Paragraph
+    , sections : List Section
+    }
+
+
+type alias Section =
+    { title : String
+    , paragraphs : List Paragraph
+    }
+
+
+type alias Paragraph =
+    List (Element Never)
+
+
+viewDocument : LegalDocument -> Element msg
+viewDocument doc =
+    column [ width fill, spacing 30 ]
+        ([ textColumn [ width fill, Theme.spacing ]
+            [ el
+                [ Font.center
+                , Font.bold
+                , Font.size 30
+                ]
+                (text doc.title)
+            , el [ Font.semiBold ] <|
+                text <|
+                    "Last updated: "
+                        ++ Date.toIsoString doc.lastUpdated
+            ]
+         , textColumn [] [ viewParagraph doc.intro ]
+         ]
+            ++ List.map viewSection doc.sections
+        )
+
+
+viewSection : Section -> Element msg
+viewSection { title, paragraphs } =
+    textColumn [ Theme.spacing ] <|
+        el
+            [ Font.bold
+            , Font.size 24
+            ]
+            (text title)
+            :: List.map viewParagraph paragraphs
+
+
+viewParagraph : Paragraph -> Element msg
+viewParagraph content =
+    Element.map never <| paragraph [] content
+
+
+link_ : String -> String -> Element msg
+link_ label url =
+    link [ Font.color <| rgb 0 0 1 ]
+        { url = url
+        , label = text label
+        }
+
+
+cookiesDocument : LegalDocument
+cookiesDocument =
+    { title = "Cookie Policy"
+    , lastUpdated = Date.fromCalendarDate 2023 Sep 7
+    , intro = [ text "This Cookie Policy explains: what cookies are, why this website uses cookies, and what you can do about it." ]
+    , sections =
+        [ { title = "Oh Cookie, Cookie, wherefore art thou a Cookie?"
+          , paragraphs =
+                [ [ text "A cookie is a small piece of data that is stored on your device when you visit a website. They are used to identify your machine. They can also potentially be used to track you across different websites." ]
+                ]
+          }
+        , { title = "Y tho"
+          , paragraphs =
+                [ [ text "The SDC map project uses Lamdera as a hosting platform. Lamdera uses a session cookie to recognize different tabs from the same browser, and to recognize the same browser connecting again in the future. The SDC map project does not use this information at all." ]
+                ]
+          }
+        , { title = "Power is nothing without a Nintendo™ Switch™ controller"
+          , paragraphs =
+                [ [ text "You cannot reject the session cookie as is technically necessary for the website to function. Feel free to delete it after you've used the website. By default it will expire automatically in 30 days." ]
+                , [ text "You can find information on how to yeet cookies in "
+                  , link_ "Firefox" "https://support.mozilla.org/en-US/kb/clear-cookies-and-site-data-firefox"
+                  , text ", "
+                  , link_ "Chrome" "https://support.google.com/chrome/answer/95647"
+                  , text ", "
+                  , link_ "Safari" "https://support.apple.com/en-ie/guide/safari/sfri11471/mac"
+                  , text ", "
+                  , link_ "Edge" "https://support.microsoft.com/en-us/microsoft-edge/delete-cookies-in-microsoft-edge-63947406-40ac-c3b8-57b9-2a946a29ae09"
+                  , text ", "
+                  , link_ "Opera" "https://help.opera.com/en/latest/web-preferences/"
+                  , text "."
+                  ]
+                ]
+          }
+        , { title = "What else?", paragraphs = [ [ text "The SDC map project does not use any other tracking technology, such as Flash Cookies, local storage, web beacons or illithid larvæ." ] ] }
+        ]
+    }
+
+
+privacyDocument : LegalDocument
+privacyDocument =
+    { title = "Privacy Policy"
+    , lastUpdated = Date.fromCalendarDate 2023 Sep 7
+    , intro = []
+    , sections = []
+    }
 
 
 isValid : Input -> Bool
@@ -348,6 +487,16 @@ viewInput input =
 update : FrontendMsg -> FrontendModel -> ( FrontendModel, Cmd FrontendMsg )
 update msg model =
     case ( msg, model ) of
+        ( UrlRequested (Browser.Internal url), _ ) ->
+            ( model
+            , Browser.Navigation.load (Url.toString url)
+            )
+
+        ( UrlRequested (Browser.External url), _ ) ->
+            ( model
+            , Browser.Navigation.load url
+            )
+
         ( Id id, Filling input maybeError ) ->
             ( Filling { input | id = id } maybeError, Cmd.none )
 

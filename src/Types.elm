@@ -1,9 +1,11 @@
 module Types exposing (BackendModel, BackendMsg, EncryptedString(..), Error, FrontendModel(..), FrontendMsg(..), Input, ToBackend(..), ToFrontend(..), inputCodec, inputOldCodec)
 
+import Browser exposing (UrlRequest)
 import Codec
 import Dict exposing (Dict)
 import Random
 import Serialize exposing (Codec)
+import Url exposing (Url)
 
 
 type alias BackendModel =
@@ -29,6 +31,8 @@ type FrontendModel
     | Submitted { id : String, input : Input }
     | AdminDecrypting String (Dict String EncryptedString)
     | AdminDecrypted (List Input)
+    | Privacy
+    | Cookies
 
 
 type alias Input =
@@ -46,7 +50,11 @@ type alias Error =
 
 
 type FrontendMsg
-    = Name String
+    = -- Navigation
+      UrlChanged Url
+    | UrlRequested UrlRequest
+      -- User input
+    | Name String
     | Country String
     | Location String
     | NameOnMap Bool

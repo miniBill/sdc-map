@@ -344,100 +344,35 @@ viewMap model locations =
         north =
             Tuple.second <| winkelTripel ( 0, 90, 0 )
 
-        svgWidth : number
-        svgWidth =
-            400
-
-        coordsWithNames : List ( ( Float, Float ), List String )
-        coordsWithNames =
-            locations
-                |> List.filterMap
-                    (\input ->
-                        findPosition model input
-                            |> Result.toMaybe
-                            |> Maybe.map winkelTripel
-                            |> Maybe.map (\pos -> ( pos, input.names ))
-                    )
-
-        ( xs, ys ) =
-            coordsWithNames
-                |> List.map (\( pos, _ ) -> pos)
-                |> List.unzip
-
-        rawMinx : Float
-        rawMinx =
-            List.minimum xs
-                |> Maybe.withDefault -east
-
-        rawMaxx : Float
-        rawMaxx =
-            List.maximum xs
-                |> Maybe.withDefault east
-
-        rawMiny : Float
-        rawMiny =
-            List.minimum ys
-                |> Maybe.withDefault -north
-
-        rawMaxy : Float
-        rawMaxy =
-            List.maximum ys
-                |> Maybe.withDefault north
-
-        expand : Float -> Float -> Float -> ( Float, Float )
-        expand rawMin rawMax ceil =
-            let
-                w : Float
-                w =
-                    rawMax - rawMin
-            in
-            ( max -ceil <| rawMin - 0.3 * w
-            , min ceil <| rawMax + 0.3 * w
-            )
-
-        ( minx, maxx ) =
-            expand rawMinx rawMaxx east
-
-        ( miny, maxy ) =
-            expand rawMiny rawMaxy north
-
-        vwidth : Float
-        vwidth =
-            maxx - minx
-
-        vheight : Float
-        vheight =
-            maxy - miny
-
-        svgRatio : Float
-        svgRatio =
-            vwidth / vheight
-
         winkelWidth : Float
         winkelWidth =
             2 * east
 
-        imageWidth =
-            2058
-
-        imageHeight =
-            1262
-
-        imageRatio =
-            imageWidth / imageHeight
-
-        height : Float
-        height =
-            winkelWidth / imageRatio
-
         background : Svg msg
         background =
+            let
+                imageWidth : number
+                imageWidth =
+                    2058
+
+                imageHeight : number
+                imageHeight =
+                    1262
+
+                imageRatio : Float
+                imageRatio =
+                    imageWidth / imageHeight
+
+                height : Float
+                height =
+                    winkelWidth / imageRatio
+            in
             Svg.image
                 [ SAttrs.href "world.jpg"
-                , SAttrs.width (STypes.px winkelWidth)
-                , SAttrs.height (STypes.px height)
-                , SAttrs.x (STypes.px -east)
-                , SAttrs.y (STypes.px <| -height / 2)
+                , SAttrs.width <| STypes.percent 100
+                , SAttrs.height <| STypes.px height
+                , SAttrs.x <| STypes.percent -50
+                , SAttrs.y <| (STypes.px <| -height / 2)
                 ]
                 []
 
@@ -446,19 +381,26 @@ viewMap model locations =
             Svg.circle
                 [ SAttrs.cx (STypes.px x)
                 , SAttrs.cy (STypes.px -y)
-                , SAttrs.r (STypes.px 0.005)
+                , SAttrs.r (STypes.px 0.02)
                 , SAttrs.fill (STypes.Paint Color.red)
                 ]
                 [ Svg.title [] [ Html.text <| String.join ", " names ] ]
     in
-    List.map viewPoint coordsWithNames
+    locations
+        |> List.filterMap
+            (\input ->
+                case findPosition model input of
+                    Ok pos ->
+                        Just <| viewPoint ( winkelTripel pos, input.names )
+
+                    Err _ ->
+                        Nothing
+            )
         |> (::) background
         |> Svg.svg
-            [ Html.Attributes.height (round <| svgWidth / svgRatio)
-            , Html.Attributes.width svgWidth
-            , SAttrs.viewBox minx -maxy vwidth vheight
-
-            -- , SAttrs.viewBox west south winkelWidth winkelHeight
+            [ Html.Attributes.style "width"
+                ("calc(100vw - " ++ String.fromInt (Theme.rythm * 4 + 4) ++ "px)")
+            , SAttrs.viewBox -east -north (2 * east) (2 * north)
             ]
         |> Element.html
 

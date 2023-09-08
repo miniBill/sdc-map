@@ -1,7 +1,7 @@
 module Documents exposing (LegalDocument, Paragraph, Section, cookiesDocument, privacyDocument, view)
 
 import Date exposing (Date)
-import Element exposing (Element, alignLeft, centerX, centerY, column, el, fill, link, paddingEach, paragraph, rgb, shrink, table, text, textColumn, width)
+import Element exposing (Element, centerX, el, fill, link, paddingEach, paragraph, rgb, text, textColumn, width)
 import Element.Font as Font
 import Theme
 import Time exposing (Month(..))
@@ -25,9 +25,8 @@ type alias Section =
     }
 
 
-type Paragraph
-    = Paragraph (List Inline)
-    | Table (List String) (List (List Inline))
+type alias Paragraph =
+    List Inline
 
 
 type Inline
@@ -36,7 +35,6 @@ type Inline
     | Visibility String
     | Link String String
     | Bold String
-    | Column (List Paragraph)
 
 
 
@@ -45,21 +43,27 @@ type Inline
 
 view : LegalDocument -> Element msg
 view doc =
+    let
+        title : Element msg
+        title =
+            el
+                [ Font.center
+                , Font.bold
+                , Font.size 36
+                ]
+                (text doc.title)
+
+        lastUpdated : List Inline
+        lastUpdated =
+            point_ "Last updated:" <| Date.toIsoString doc.lastUpdated ++ "."
+    in
     textColumn
         [ Theme.spacing
         , width <| Element.maximum 700 fill
         , centerX
         ]
-        (el
-            [ Font.center
-            , Font.bold
-            , Font.size 36
-            ]
-            (text doc.title)
-            :: List.map viewParagraph
-                (Paragraph (point_ "Last updated:" <| Date.toIsoString doc.lastUpdated ++ ".")
-                    :: doc.intro
-                )
+        (title
+            :: List.map viewParagraph (lastUpdated :: doc.intro)
             ++ List.concatMap viewSection doc.sections
         )
 
@@ -77,30 +81,7 @@ viewSection { title, paragraphs } =
 
 viewParagraph : Paragraph -> Element msg
 viewParagraph content =
-    case content of
-        Paragraph inlines ->
-            paragraph [] (List.map viewInline inlines)
-
-        Table headers cells ->
-            let
-                toColumn : Int -> String -> Theme.Column (List Inline) msg
-                toColumn i header =
-                    { header = header
-                    , view =
-                        \row ->
-                            case List.drop i row of
-                                inline :: _ ->
-                                    ( [], viewInline inline )
-
-                                [] ->
-                                    ( [], Element.none )
-                    , width = shrink
-                    }
-            in
-            Theme.table []
-                { data = cells
-                , columns = List.indexedMap toColumn headers
-                }
+    paragraph [] (List.map viewInline content)
 
 
 viewInline : Inline -> Element msg
@@ -123,9 +104,6 @@ viewInline inline =
 
         Bold content ->
             el [ Font.bold ] (text content)
-
-        Column content ->
-            Theme.column [] (List.map viewParagraph content)
 
 
 
@@ -156,18 +134,18 @@ cookiesDocument =
     { title = "Cookie Policy"
     , lastUpdated = Date.fromCalendarDate 2023 Sep 8
     , intro =
-        [ Paragraph [ Text "This Cookie Policy explains: what cookies are, why this website uses cookies, and what you can do about it." ]
-        , Paragraph [ Text "For any questions or concerns, contact us at ", emailLink, Text "." ]
+        [ [ Text "This Cookie Policy explains: what cookies are, why this website uses cookies, and what you can do about it." ]
+        , [ Text "For any questions or concerns, contact us at ", emailLink, Text "." ]
         ]
     , sections =
         [ { title = "Oh Cookie, Cookie, wherefore art thou a Cookie?"
           , paragraphs =
-                [ Paragraph [ Text "A cookie is a small piece of data that is stored on your device when you visit a website. They are used to identify your machine. They can also potentially be used to track you across different websites." ]
+                [ [ Text "A cookie is a small piece of data that is stored on your device when you visit a website. They are used to identify your machine. They can also potentially be used to track you across different websites." ]
                 ]
           }
         , { title = "Y tho"
           , paragraphs =
-                [ Paragraph [ Text "The SDC map project uses Lamdera as a hosting platform. Lamdera uses a session cookie to recognize different tabs from the same browser, and to recognize the same browser connecting again in the future. The SDC map project does not use this information at all." ]
+                [ [ Text "The SDC map project uses Lamdera as a hosting platform. Lamdera uses a session cookie to recognize different tabs from the same browser, and to recognize the same browser connecting again in the future. The SDC map project does not use this information at all." ]
                 ]
           }
         , { title = "Power is nothing without a Nintendo™ Switch™ controller"
@@ -186,11 +164,10 @@ cookiesDocument =
                   , Text "."
                   ]
                 ]
-                    |> List.map Paragraph
           }
         , { title = "What else?"
           , paragraphs =
-                [ Paragraph [ Text "The SDC map project does not use any other tracking technology, such as Flash Cookies, local storage, web beacons or illithid larvæ." ]
+                [ [ Text "The SDC map project does not use any other tracking technology, such as Flash Cookies, local storage, web beacons or illithid larvæ." ]
                 ]
           }
         ]
@@ -205,7 +182,6 @@ privacyDocument =
         [ [ Text "This Privacy Policy describes how and why the SDC map project collects, stores, uses and shares your information." ]
         , [ Text "For any questions or concerns, contact us at ", emailLink, Text "." ]
         ]
-            |> List.map Paragraph
     , sections =
         [ { title = "Summary"
           , paragraphs =
@@ -227,28 +203,13 @@ privacyDocument =
                     , Text ", Signal, or even regular mail if you already know my address. Please refrain from using Pidgeon Post."
                     ]
                 ]
-                    |> List.map Paragraph
           }
         , { title = "What information is handled"
           , paragraphs =
-                [ Paragraph
-                    [ Text "In short: your replies to the survey. In more details this is how each field is handled, depending on what you choose for the "
-                    , Term "Show name on map"
-                    , Text " question:"
-                    ]
-                , let
-                    cell : ( String, String ) -> Inline
-                    cell ( viz, why ) =
-                        Column
-                            [ Paragraph [ Visibility viz ]
-                            , Paragraph [ Text why ]
-                            ]
-                  in
-                  Table [ "Name", "Show on map", "Only use your data for statistics" ]
-                    ([ ( "Name", ( "public", "The name is used to show you on the map" ), ( "private", "" ) )
-                     ]
-                        |> List.map (\( field, onMap, stats ) -> [ Bold field, cell onMap, cell stats ])
-                    )
+                [ [ Text "In short: your replies to the survey. In more details this is how each field is handled, depending on what you choose for the "
+                  , Term "Show name on map"
+                  , Text " question:"
+                  ]
                 , point "Name:"
                     [ Text "If you select to "
                     , Term "show your name on the map"
@@ -260,7 +221,6 @@ privacyDocument =
                     , Visibility "private"
                     , Text "."
                     ]
-                    |> Paragraph
                 , point "Country:"
                     [ Text "If you select to "
                     , Term "show your name on the map"
@@ -272,7 +232,6 @@ privacyDocument =
                     , Visibility "public - in aggregate form only"
                     , Text "."
                     ]
-                    |> Paragraph
                 , point "Location:"
                     [ Text "If you select to "
                     , Term "show your name on the map"
@@ -284,25 +243,21 @@ privacyDocument =
                     , Visibility "private"
                     , Text ". In fact, you should avoid filling it in if you select that option."
                     ]
-                    |> Paragraph
-                , point_ "Show name on map:" "This is what determines how your data is used." |> Paragraph
+                , point_ "Show name on map:" "This is what determines how your data is used."
                 , point "Contact"
                     [ Text "This is only used for data deletion and update request and is thus "
                     , Visibility "private"
                     , Text "."
                     ]
-                    |> Paragraph
                 , point "Anti-bot"
                     [ Text "This is only used for spam prevention and is thus "
                     , Visibility "private"
                     , Text "."
                     ]
-                    |> Paragraph
                 , [ Text "In addition, your data is associated with a random ID that you get told after filling in the data. That ID is only used for data deletion and update request and is thus "
                   , Visibility "private"
                   , Text "."
                   ]
-                    |> Paragraph
                 ]
           }
         ]

@@ -2,7 +2,7 @@ module Dashboard exposing (Country, Location, Model, Msg, init, update, view)
 
 import Color
 import Dict exposing (Dict)
-import Element exposing (Attribute, Column, Element, alignRight, alignTop, centerX, centerY, el, fill, paragraph, px, rgb, shrink, text, width, wrappedRow)
+import Element exposing (Element, alignTop, centerX, el, fill, paragraph, px, rgb, shrink, text, width, wrappedRow)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -228,12 +228,12 @@ viewOnMap model =
                 |> List.sortBy (\{ country, location } -> ( country, location ))
     in
     { onMap =
-        table [ alignTop ]
+        Theme.table [ alignTop ]
             { data = filteredInputs
             , columns =
-                [ tableColumnText "Name" .name
-                , tableColumnText "Country" .country
-                , tableColumnText "Location" .location
+                [ Theme.tableColumnText "Name" .name
+                , Theme.tableColumnText "Country" .country
+                , Theme.tableColumnText "Location" .location
                 ]
             }
     , geoData =
@@ -247,12 +247,12 @@ viewOnMap model =
 
                 Success _ ->
                     text "Loaded index data."
-            , table []
+            , Theme.table []
                 { data = Dict.toList model.geoJsonData
                 , columns =
-                    [ Just <| tableColumnText "Country" Tuple.first
+                    [ Just <| Theme.tableColumnText "Country" Tuple.first
                     , Just <|
-                        tableColumnText "Status" <|
+                        Theme.tableColumnText "Status" <|
                             \( _, geoJson ) ->
                                 case geoJson of
                                     Failure (Just e) ->
@@ -270,13 +270,14 @@ viewOnMap model =
                         Nothing
 
                       else
-                        { header = text "Commands"
+                        { header = "Commands"
                         , width = shrink
                         , view =
                             \( country, geoJson ) ->
                                 case geoJson of
                                     Failure (Just _) ->
-                                        Theme.button []
+                                        ( []
+                                        , Theme.button []
                                             { label =
                                                 case
                                                     model.indexData
@@ -291,9 +292,10 @@ viewOnMap model =
                                                         text <| "Reload " ++ threeLetterCode
                                             , onPress = Just (ReloadCountry country)
                                             }
+                                        )
 
                                     _ ->
-                                        Element.none
+                                        ( [], Element.none )
                         }
                             |> Just
                     ]
@@ -306,13 +308,13 @@ viewOnMap model =
                 paragraph [] [ text <| String.join " " <| "make -j" :: needed ]
             ]
     , locations =
-        table []
+        Theme.table []
             { data = locations
             , columns =
-                [ tableColumnText "Country" .country
-                , tableColumnText "Location" .location
-                , tableColumnText "Found?"
-                    (\input ->
+                [ Theme.tableColumnText "Country" .country
+                , Theme.tableColumnText "Location" .location
+                , Theme.tableColumnText "Found?" <|
+                    \input ->
                         case findPosition model input of
                             Ok ( lon, lat, _ ) ->
                                 let
@@ -326,7 +328,6 @@ viewOnMap model =
 
                             Err e ->
                                 "Err: " ++ e
-                    )
                 ]
             }
     , map = viewMap model locations
@@ -538,12 +539,12 @@ viewByCountry model =
                 |> List.sortBy (\{ count } -> -count)
     in
     Theme.column []
-        [ table []
+        [ Theme.table []
             { data =
                 data
             , columns =
-                [ tableColumnText "Country" .country
-                , tableColumnNumber "Count" .count
+                [ Theme.tableColumnText "Country" .country
+                , Theme.tableColumnNumber "Count" .count
                 ]
             }
         , data
@@ -554,31 +555,9 @@ viewByCountry model =
         ]
 
 
-tableColumnElement : String -> (element -> Element msg) -> Column element msg
-tableColumnElement headerLabel toCell =
-    { header = text headerLabel
-    , view = \row -> el [ centerY ] <| toCell row
-    , width = shrink
-    }
-
-
-tableColumnNumber : String -> (element -> Int) -> Column element msg
-tableColumnNumber headerLabel toCell =
-    { header = text headerLabel
-    , view = \row -> el [ centerY, alignRight ] <| text <| String.fromInt <| toCell row
-    , width = shrink
-    }
-
-
-tableColumnText : String -> (element -> String) -> Column element msg
-tableColumnText headerLabel toCell =
-    tableColumnElement headerLabel
-        (\row -> text <| toCell row)
-
-
 viewCaptchas : Model -> Element Msg
 viewCaptchas { invalidCaptchas, inputs } =
-    table []
+    Theme.table []
         { data =
             inputs
                 |> List.Extra.gatherEqualsBy (\{ captcha } -> String.toLower captcha)
@@ -590,9 +569,9 @@ viewCaptchas { invalidCaptchas, inputs } =
                     )
                 |> List.sortBy (\{ count } -> -count)
         , columns =
-            [ tableColumnText "Captcha" .captcha
-            , tableColumnNumber "Count" .count
-            , { header = text "Is valid"
+            [ Theme.tableColumnText "Captcha" .captcha
+            , Theme.tableColumnNumber "Count" .count
+            , { header = "Is valid"
               , view =
                     \{ captcha } ->
                         let
@@ -603,7 +582,8 @@ viewCaptchas { invalidCaptchas, inputs } =
                                 else
                                     ( "Yes", Set.insert )
                         in
-                        Theme.button [ centerX ]
+                        ( []
+                        , Theme.button [ centerX ]
                             { onPress =
                                 invalidCaptchas
                                     |> updater captcha
@@ -611,86 +591,11 @@ viewCaptchas { invalidCaptchas, inputs } =
                                     |> Just
                             , label = text label
                             }
+                        )
               , width = shrink
               }
             ]
         }
-
-
-table : List (Attribute msg) -> { data : List record, columns : List (Column record msg) } -> Element msg
-table attrs config =
-    Element.indexedTable attrs
-        { data = config.data
-        , columns =
-            config.columns
-                |> List.indexedMap
-                    (\col column ->
-                        { header = header col column.header
-                        , view = \row -> cell row col column.view
-                        , width = column.width
-                        }
-                    )
-        }
-
-
-cell : Int -> Int -> (record -> Element msg) -> record -> Element msg
-cell row col cellView record =
-    let
-        leftPadding : number
-        leftPadding =
-            if col == 0 then
-                0
-
-            else
-                Theme.rythm
-
-        topPadding : Int
-        topPadding =
-            if row == 0 then
-                Theme.rythm // 2
-
-            else
-                Theme.rythm
-    in
-    el
-        [ Element.paddingEach
-            { left = leftPadding
-            , right = 0
-            , top = topPadding
-            , bottom = 0
-            }
-        , centerY
-        ]
-        (cellView record)
-
-
-header : Int -> Element msg -> Element msg
-header col child =
-    el
-        [ Font.bold
-        , Border.widthEach
-            { top = 0
-            , left = 0
-            , right = 0
-            , bottom = 1
-            }
-        , if col == 0 then
-            Element.paddingEach
-                { left = 0
-                , right = 0
-                , top = 0
-                , bottom = Theme.rythm // 2
-                }
-
-          else
-            Element.paddingEach
-                { left = Theme.rythm
-                , right = 0
-                , top = 0
-                , bottom = Theme.rythm // 2
-                }
-        ]
-        child
 
 
 card :

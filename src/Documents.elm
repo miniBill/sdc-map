@@ -1,7 +1,7 @@
 module Documents exposing (LegalDocument, Paragraph, Section, cookiesDocument, privacyDocument, view)
 
 import Date exposing (Date)
-import Element exposing (Element, centerX, column, el, fill, link, paddingEach, paragraph, rgb, text, textColumn, width)
+import Element exposing (Element, centerX, centerY, column, el, fill, link, paddingEach, paragraph, rgb, shrink, table, text, textColumn, width)
 import Element.Font as Font
 import Theme
 import Time exposing (Month(..))
@@ -84,7 +84,7 @@ term content =
 
 visibility : String -> Element msg
 visibility content =
-    el [ Theme.style "font-variant" "small-caps", Font.semiBold ] (text content)
+    el [ Theme.style "font-variant" "small-caps", Font.bold ] (text content)
 
 
 point : String -> List (Element msg) -> List (Element msg)

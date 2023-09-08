@@ -1,6 +1,6 @@
-module Theme exposing (button, column, padding, row, rythm, spacing, style)
+module Theme exposing (backgroundColor, button, column, padding, row, rythm, spacing, style)
 
-import Element exposing (Attribute, Element)
+import Element exposing (Attribute, Element, rgb255)
 import Element.Border as Border
 import Element.Input as Input
 import Html.Attributes
@@ -41,3 +41,8 @@ button attrs config =
 style : String -> String -> Attribute msg
 style key value =
     Element.htmlAttribute <| Html.Attributes.style key value
+
+
+backgroundColor : Element.Color
+backgroundColor =
+    rgb255 0xC0 0xBD 0xB6

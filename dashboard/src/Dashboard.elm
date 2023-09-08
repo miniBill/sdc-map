@@ -20,6 +20,7 @@ import Round
 import Set exposing (Set)
 import Task
 import Theme
+import Theme.Dashboard as Theme
 import TypedSvg as Svg
 import TypedSvg.Attributes as SAttrs
 import TypedSvg.Core exposing (Svg)

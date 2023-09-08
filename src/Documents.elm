@@ -1,7 +1,7 @@
-module Documents exposing (LegalDocument, Paragraph, Section, cookiesDocument, privacyDocument, viewDocument)
+module Documents exposing (LegalDocument, Paragraph, Section, cookiesDocument, privacyDocument, view)
 
 import Date exposing (Date)
-import Element exposing (Element, el, link, paddingEach, paragraph, rgb, text, textColumn)
+import Element exposing (Element, centerX, column, el, fill, link, paddingEach, paragraph, rgb, text, textColumn, width)
 import Element.Font as Font
 import Theme
 import Time exposing (Month(..))
@@ -29,9 +29,72 @@ type alias Paragraph =
     List (Element Never)
 
 
+
+-- View
+
+
+view : LegalDocument -> Element msg
+view doc =
+    textColumn
+        [ Theme.spacing
+        , width <| Element.maximum 700 fill
+        , centerX
+        ]
+        (el
+            [ Font.center
+            , Font.bold
+            , Font.size 36
+            ]
+            (text doc.title)
+            :: paragraph [] (point_ "Last updated:" <| Date.toIsoString doc.lastUpdated ++ ".")
+            :: List.map viewParagraph doc.intro
+            ++ List.concatMap viewSection doc.sections
+        )
+
+
+viewSection : Section -> List (Element msg)
+viewSection { title, paragraphs } =
+    paragraph
+        [ Font.bold
+        , Font.size 28
+        , paddingEach { top = 3 * Theme.rythm, left = 0, right = 0, bottom = 0 }
+        ]
+        [ text title ]
+        :: List.map viewParagraph paragraphs
+
+
 viewParagraph : Paragraph -> Element msg
 viewParagraph content =
     Element.map never <| paragraph [] content
+
+
+
+-- Shortcuts
+
+
+emailLink : Element msg
+emailLink =
+    link_ "leonardo@taglialegne.it" "mailto:leonardo@taglialegne.it?subject=SDC%20map%20project"
+
+
+term : String -> Element msg
+term content =
+    el [ Theme.style "font-variant" "small-caps" ] (text content)
+
+
+visibility : String -> Element msg
+visibility content =
+    el [ Theme.style "font-variant" "small-caps", Font.semiBold ] (text content)
+
+
+point : String -> List (Element msg) -> List (Element msg)
+point label content =
+    el [ Font.bold ] (text label) :: text " " :: content
+
+
+point_ : String -> String -> List (Element msg)
+point_ label content =
+    point label [ text content ]
 
 
 link_ : String -> String -> Element msg
@@ -42,40 +105,18 @@ link_ label url =
         }
 
 
-viewSection : Section -> List (Element msg)
-viewSection { title, paragraphs } =
-    el
-        [ Font.bold
-        , Font.size 28
-        , paddingEach { top = 3 * Theme.rythm, left = 0, right = 0, bottom = 0 }
-        ]
-        (text title)
-        :: List.map viewParagraph paragraphs
 
-
-viewDocument : LegalDocument -> Element msg
-viewDocument doc =
-    textColumn [ Theme.spacing ] <|
-        el
-            [ Font.center
-            , Font.bold
-            , Font.size 36
-            ]
-            (text doc.title)
-            :: el [ Font.semiBold ]
-                (text <|
-                    "Last updated: "
-                        ++ Date.toIsoString doc.lastUpdated
-                )
-            :: List.map viewParagraph doc.intro
-            ++ List.concatMap viewSection doc.sections
+-- Documents
 
 
 cookiesDocument : LegalDocument
 cookiesDocument =
     { title = "Cookie Policy"
     , lastUpdated = Date.fromCalendarDate 2023 Sep 8
-    , intro = [ [ text "This Cookie Policy explains: what cookies are, why this website uses cookies, and what you can do about it." ] ]
+    , intro =
+        [ [ text "This Cookie Policy explains: what cookies are, why this website uses cookies, and what you can do about it." ]
+        , [ text "For any questions or concerns, contact us at ", emailLink, text "." ]
+        ]
     , sections =
         [ { title = "Oh Cookie, Cookie, wherefore art thou a Cookie?"
           , paragraphs =
@@ -109,36 +150,13 @@ cookiesDocument =
     }
 
 
-point : String -> List (Element msg) -> List (Element msg)
-point label content =
-    el [ Font.bold ] (text label) :: text " " :: content
-
-
-point_ : String -> String -> List (Element msg)
-point_ label content =
-    point label [ text content ]
-
-
 privacyDocument : LegalDocument
 privacyDocument =
-    let
-        emailLink : Element msg
-        emailLink =
-            link_ "leonardo@taglialegne.it" "mailto:leonardo@taglialegne.it?subject=SDC%20map%20project"
-
-        term : String -> Element msg
-        term content =
-            el [ Theme.style "font-variant" "small-caps" ] (text content)
-
-        visibility : String -> Element msg
-        visibility content =
-            el [ Theme.style "font-variant" "small-caps", Font.semiBold ] (text content)
-    in
     { title = "Privacy Policy"
     , lastUpdated = Date.fromCalendarDate 2023 Sep 8
     , intro =
         [ [ text "This Privacy Policy describes how and why the SDC map project collects, stores, uses and shares your information." ]
-        , [ text "For any questions or concerns, contact me at ", emailLink, text "." ]
+        , [ text "For any questions or concerns, contact us at ", emailLink, text "." ]
         ]
     , sections =
         [ { title = "Summary"

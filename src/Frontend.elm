@@ -6,7 +6,7 @@ import Browser exposing (Document, UrlRequest)
 import Browser.Navigation
 import Codec
 import Dict
-import Documents exposing (cookiesDocument, privacyDocument, viewDocument)
+import Documents
 import Element exposing (Element, alignBottom, centerX, el, fill, height, link, paddingEach, paragraph, rgb255, shrink, text, width)
 import Element.Background as Background
 import Element.Font as Font
@@ -138,10 +138,10 @@ view : FrontendModel -> Element FrontendMsg
 view model =
     case model of
         Privacy ->
-            viewDocument privacyDocument
+            Documents.view Documents.privacyDocument
 
         Cookies ->
-            viewDocument cookiesDocument
+            Documents.view Documents.cookiesDocument
 
         AdminDecrypting key _ ->
             Theme.column []

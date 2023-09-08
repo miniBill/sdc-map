@@ -1,4 +1,4 @@
-module Theme.Dashboard exposing (Column, cell, header, table, tableCell, tableColumnElement, tableColumnNumber, tableColumnText)
+module Theme.Dashboard exposing (Column, table, tableColumnNumber, tableColumnText)
 
 import Element exposing (Attribute, Element, Length, alignRight, centerY, el, shrink, text)
 import Element.Border as Border
@@ -55,11 +55,6 @@ table attrs config =
                         }
                     )
         }
-
-
-cell : List (Attribute msg) -> Element msg -> ( List (Attribute msg), Element msg )
-cell attrs child =
-    ( attrs, child )
 
 
 tableCell : Int -> (record -> ( List (Attribute msg), Element msg )) -> Int -> record -> Element msg

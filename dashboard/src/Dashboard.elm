@@ -8,8 +8,6 @@ import Element.Border as Border
 import Element.Font as Font
 import FNV1a
 import GeoJson exposing (GeoJsonObject(..), Geometry(..), Position)
-import Html
-import Html.Attributes
 import Http
 import Http.Tasks
 import Json.Decode exposing (Decoder)
@@ -19,9 +17,9 @@ import RemoteData exposing (RemoteData(..), WebData)
 import Result.Extra
 import Round
 import Set exposing (Set)
-import Svg exposing (Svg)
-import Svg.Attributes as SAttrs
-import Svg.Attributes.Extra as EAttrs
+import Svg.String as Svg exposing (Svg)
+import Svg.String.Attributes as SAttrs
+import Svg.String.Attributes.Extra as EAttrs
 import Task
 import Theme
 import Theme.Dashboard as Theme
@@ -388,7 +386,7 @@ viewMap model locations =
                 height =
                     winkelWidth / imageRatio
             in
-            Svg.image
+            Svg.node "image"
                 [ EAttrs.href "world.jpg"
                 , SAttrs.width <| EAttrs.percent 100
                 , SAttrs.height <| EAttrs.px height
@@ -405,7 +403,7 @@ viewMap model locations =
                 , SAttrs.r (EAttrs.percent 0.2)
                 , SAttrs.fill (EAttrs.color Color.red)
                 ]
-                [ Svg.title [] [ Html.text <| String.join ", " names ] ]
+                [ Svg.node "title" [] [ Svg.text <| String.join ", " names ] ]
 
         countries : List Country
         countries =
@@ -455,10 +453,13 @@ viewMap model locations =
     , locationDots
     ]
         |> Svg.svg
-            [ Html.Attributes.style "width"
-                ("calc(100vw - " ++ String.fromInt (Theme.rythm * 4 + 4) ++ "px)")
+            [ SAttrs.attribute "style" <|
+                "width: calc(100vw - "
+                    ++ EAttrs.px (Theme.rythm * 4 + 4)
+                    ++ ")"
             , EAttrs.viewBox -east -north (2 * east) (2 * north)
             ]
+        |> Svg.toHtml
         |> Element.html
 
 
@@ -475,10 +476,10 @@ viewCountryBorders country geometry =
                     []
 
                 LineString _ ->
-                    [ Svg.text_ [] [ Html.text "branch 'LineString _' not implemented" ] ]
+                    [ Svg.text_ [] [ Svg.text "branch 'LineString _' not implemented" ] ]
 
                 MultiLineString _ ->
-                    [ Svg.text_ [] [ Html.text "branch 'MultiLineString _' not implemented" ] ]
+                    [ Svg.text_ [] [ Svg.text "branch 'MultiLineString _' not implemented" ] ]
 
                 Polygon polygons ->
                     List.map
@@ -554,14 +555,14 @@ viewPolygon points =
                            )
     in
     if count >= 5 then
-        Svg.polygon
+        Svg.node "polygon"
             [ EAttrs.points projected
             ]
             [-- Html.text <| String.fromInt count
             ]
 
     else
-        Html.text ""
+        Svg.text ""
 
 
 countryColor : String -> Color

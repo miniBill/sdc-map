@@ -3,11 +3,12 @@ module Pie exposing (view)
 import Array exposing (Array)
 import Color exposing (Color)
 import Color.Oklch
+import Html exposing (Html)
 import Path
 import Shape exposing (defaultPieConfig)
-import Svg exposing (Svg, g, svg, text, text_)
-import Svg.Attributes exposing (dy, fill, fontSize, stroke, textAnchor, transform)
-import Svg.Attributes.Extra as EAttrs
+import Svg.String as Svg exposing (Svg, g, svg, text, text_)
+import Svg.String.Attributes as SAttrs exposing (dy, fill, fontSize, stroke, transform)
+import Svg.String.Attributes.Extra as EAttrs
 
 
 w : Float
@@ -27,10 +28,12 @@ radius =
 
 pieSlice : Array Color -> Int -> Shape.Arc -> Svg msg
 pieSlice colors index datum =
-    Path.element (Shape.arc datum)
-        [ fill <| EAttrs.color <| Maybe.withDefault Color.black <| Array.get index colors
+    Svg.node "path"
+        [ SAttrs.attribute "d" (Path.toString (Shape.arc datum))
+        , fill <| EAttrs.color <| Maybe.withDefault Color.black <| Array.get index colors
         , stroke <| EAttrs.color Color.white
         ]
+        []
 
 
 pieLabel : Shape.Arc -> ( String, Float ) -> Svg msg
@@ -46,12 +49,12 @@ pieLabel slice ( label, _ ) =
     text_
         [ transform <| EAttrs.translate x y
         , dy (EAttrs.em 0.35)
-        , textAnchor "middle"
+        , SAttrs.attribute "text-anchor" "middle"
         ]
         [ text label ]
 
 
-view : List ( String, Float ) -> Svg msg
+view : List ( String, Float ) -> Html msg
 view model =
     let
         pieData : List Shape.Arc
@@ -75,12 +78,13 @@ view model =
                     )
                 |> Array.fromList
     in
-    svg [ EAttrs.viewBox 0 0 w h ]
-        [ g
-            [ transform <| EAttrs.translate (w / 2) (h / 2)
-            , fontSize (EAttrs.px <| min w h / 20)
+    Svg.toHtml <|
+        svg [ EAttrs.viewBox 0 0 w h ]
+            [ g
+                [ transform <| EAttrs.translate (w / 2) (h / 2)
+                , fontSize (EAttrs.px <| min w h / 20)
+                ]
+                [ g [] <| List.indexedMap (pieSlice colors) pieData
+                , g [] <| List.map2 pieLabel pieData model
+                ]
             ]
-            [ g [] <| List.indexedMap (pieSlice colors) pieData
-            , g [] <| List.map2 pieLabel pieData model
-            ]
-        ]

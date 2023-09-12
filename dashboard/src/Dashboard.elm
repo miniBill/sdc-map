@@ -465,8 +465,8 @@ viewMap model locations =
 
 viewCountryBorders : String -> Geometry -> Svg msg
 viewCountryBorders country geometry =
-    case geometry of
-        Point p ->
+    let
+        viewPoint p =
             let
                 ( cx, cy ) =
                     winkelTripelFlip p
@@ -475,39 +475,86 @@ viewCountryBorders country geometry =
                 [ SAttrs.cx <| STypes.px cx
                 , SAttrs.cy <| STypes.px cy
                 , SAttrs.r <| STypes.px 10
+                , SAttrs.fill <| STypes.Paint <| countryColor country
                 ]
                 []
 
-        MultiPoint points ->
-            points
-                |> List.map (Point >> viewCountryBorders country)
-                |> Svg.g []
+        go : Geometry -> List (Svg msg)
+        go child =
+            case child of
+                Point p ->
+                    [ viewPoint p ]
 
-        LineString _ ->
-            Svg.text_ [] [ Html.text "branch 'LineString _' not implemented" ]
+                MultiPoint points ->
+                    List.map
+                        viewPoint
+                        points
 
-        MultiLineString _ ->
-            Svg.text_ [] [ Html.text "branch 'MultiLineString _' not implemented" ]
+                LineString _ ->
+                    [ Svg.text_ [] [ Html.text "branch 'LineString _' not implemented" ] ]
 
-        Polygon polygons ->
-            polygons
-                |> List.map (viewPolygon country)
-                |> Svg.g []
+                MultiLineString _ ->
+                    [ Svg.text_ [] [ Html.text "branch 'MultiLineString _' not implemented" ] ]
 
-        MultiPolygon polygons ->
-            polygons
-                |> List.concat
-                |> List.map (viewPolygon country)
-                |> Svg.g []
+                Polygon polygons ->
+                    List.filterMap
+                        viewPolygon
+                        polygons
 
-        GeometryCollection children ->
-            children
-                |> List.map (viewCountryBorders country)
-                |> Svg.g []
+                MultiPolygon polygons ->
+                    polygons
+                        |> List.concat
+                        |> List.filterMap viewPolygon
+
+                GeometryCollection children ->
+                    List.concatMap go children
+    in
+    Svg.g
+        [ SAttrs.fill <| STypes.Paint <| countryColor country
+        , SAttrs.stroke <| STypes.Paint Color.black
+        , SAttrs.strokeWidth <| STypes.px 0.0015
+        ]
+        (go geometry)
 
 
-viewPolygon : String -> List Position -> Svg msg
-viewPolygon country points =
+viewPolygon : List Position -> Maybe (Svg msg)
+viewPolygon points =
+    let
+        projected =
+            case
+                points
+                    |> List.map winkelTripelFlip
+            of
+                [] ->
+                    []
+
+                head :: tail ->
+                    List.foldl
+                        (\e ( last, acc ) ->
+                            if e == last then
+                                ( last, acc )
+
+                            else
+                                ( e, last :: acc )
+                        )
+                        ( head, [] )
+                        tail
+                        |> (\( last, acc ) -> last :: acc)
+    in
+    case projected of
+        _ :: _ :: _ ->
+            Svg.polygon
+                [ SAttrs.points projected
+                ]
+                []
+                |> Just
+
+        _ ->
+            Nothing
+
+
+countryColor : String -> Color
+countryColor country =
     let
         hash : Int
         hash =
@@ -522,18 +569,8 @@ viewPolygon country points =
         div : Int -> Float
         div n =
             toFloat (modBy 256 n) / 255
-
-        color : Color
-        color =
-            Color.rgba r g b 0.2
     in
-    Svg.polygon
-        [ SAttrs.points <| List.map winkelTripelFlip points
-        , SAttrs.fill <| STypes.Paint color
-        , SAttrs.stroke <| STypes.Paint Color.black
-        , SAttrs.strokeWidth <| STypes.px 0.0015
-        ]
-        []
+    Color.rgba r g b 0.4
 
 
 winkelTripelFlip : Position -> ( Float, Float )
@@ -565,8 +602,15 @@ winkelTripel ( long, lat, _ ) =
 
         y =
             0.5 * (phi + sin phi / sinc alpha)
+
+        roundish v =
+            ((v * 10000)
+                |> round
+                |> toFloat
+            )
+                / 10000
     in
-    ( x, y )
+    ( roundish x, roundish y )
 
 
 sinc : Float -> Float

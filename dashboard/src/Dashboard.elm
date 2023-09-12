@@ -1,11 +1,12 @@
 module Dashboard exposing (Country, Location, Model, Msg, init, update, view)
 
-import Color
+import Color exposing (Color)
 import Dict exposing (Dict)
 import Element exposing (Element, alignTop, centerX, el, fill, paragraph, px, rgb, shrink, text, width, wrappedRow)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
+import FNV1a
 import GeoJson exposing (GeoJsonObject(..), Geometry(..), Position)
 import Html
 import Html.Attributes
@@ -424,7 +425,7 @@ viewMap model locations =
                                 List.Extra.find
                                     (\location -> location.name == country)
                                     countryLocations
-                                    |> Maybe.map (.geometry >> viewCountryBorders)
+                                    |> Maybe.map (\{ geometry } -> viewCountryBorders country geometry)
 
                             _ ->
                                 Nothing
@@ -462,8 +463,8 @@ viewMap model locations =
         |> Element.html
 
 
-viewCountryBorders : Geometry -> Svg msg
-viewCountryBorders geometry =
+viewCountryBorders : String -> Geometry -> Svg msg
+viewCountryBorders country geometry =
     case geometry of
         Point p ->
             let
@@ -479,7 +480,7 @@ viewCountryBorders geometry =
 
         MultiPoint points ->
             points
-                |> List.map (Point >> viewCountryBorders)
+                |> List.map (Point >> viewCountryBorders country)
                 |> Svg.g []
 
         LineString _ ->
@@ -488,30 +489,51 @@ viewCountryBorders geometry =
         MultiLineString _ ->
             Svg.text_ [] [ Html.text "branch 'MultiLineString _' not implemented" ]
 
-        Polygon [ points ] ->
-            Svg.polygon
-                [ SAttrs.points <| List.map winkelTripelFlip points
-                , SAttrs.fill <| STypes.Paint <| Color.rgba 1 0 0 0.2
-                ]
-                []
-
-        Polygon [] ->
-            Html.text ""
-
         Polygon polygons ->
             polygons
-                |> List.map (List.singleton >> Polygon >> viewCountryBorders)
+                |> List.map (viewPolygon country)
                 |> Svg.g []
 
         MultiPolygon polygons ->
             polygons
-                |> List.map (Polygon >> viewCountryBorders)
+                |> List.concat
+                |> List.map (viewPolygon country)
                 |> Svg.g []
 
         GeometryCollection children ->
             children
-                |> List.map viewCountryBorders
+                |> List.map (viewCountryBorders country)
                 |> Svg.g []
+
+
+viewPolygon : String -> List Position -> Svg msg
+viewPolygon country points =
+    let
+        hash : Int
+        hash =
+            FNV1a.hash country
+
+        ( r, g, b ) =
+            ( div (hash // (256 * 256))
+            , div (hash // 256)
+            , div (hash // 1)
+            )
+
+        div : Int -> Float
+        div n =
+            toFloat (modBy 256 n) / 255
+
+        color : Color
+        color =
+            Color.rgba r g b 0.2
+    in
+    Svg.polygon
+        [ SAttrs.points <| List.map winkelTripelFlip points
+        , SAttrs.fill <| STypes.Paint color
+        , SAttrs.stroke <| STypes.Paint Color.black
+        , SAttrs.strokeWidth <| STypes.px 0.0015
+        ]
+        []
 
 
 winkelTripelFlip : Position -> ( Float, Float )

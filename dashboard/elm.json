@@ -28,7 +28,8 @@
             "miniBill/elm-oklch": "1.0.0",
             "miniBill/elm-result-extra": "1.0.0",
             "myrho/elm-round": "1.0.5",
-            "prikhi/http-tasks": "1.0.0"
+            "prikhi/http-tasks": "1.0.0",
+            "robinheghan/fnv1a": "1.0.0"
         },
         "indirect": {
             "bburdette/toop": "1.2.0",

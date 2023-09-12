@@ -5,10 +5,9 @@ import Color exposing (Color)
 import Color.Oklch
 import Path
 import Shape exposing (defaultPieConfig)
-import TypedSvg exposing (g, svg, text_)
-import TypedSvg.Attributes exposing (dy, fill, fontSize, stroke, textAnchor, transform, viewBox)
-import TypedSvg.Core exposing (Svg, text)
-import TypedSvg.Types exposing (AnchorAlignment(..), Paint(..), Transform(..), em, px)
+import Svg exposing (Svg, g, svg, text, text_)
+import Svg.Attributes exposing (dy, fill, fontSize, stroke, textAnchor, transform)
+import Svg.Attributes.Extra as EAttrs
 
 
 w : Float
@@ -29,8 +28,8 @@ radius =
 pieSlice : Array Color -> Int -> Shape.Arc -> Svg msg
 pieSlice colors index datum =
     Path.element (Shape.arc datum)
-        [ fill <| Paint <| Maybe.withDefault Color.black <| Array.get index colors
-        , stroke <| Paint Color.white
+        [ fill <| EAttrs.color <| Maybe.withDefault Color.black <| Array.get index colors
+        , stroke <| EAttrs.color Color.white
         ]
 
 
@@ -45,9 +44,9 @@ pieLabel slice ( label, _ ) =
                 }
     in
     text_
-        [ transform [ Translate x y ]
-        , dy (em 0.35)
-        , textAnchor AnchorMiddle
+        [ transform <| EAttrs.translate x y
+        , dy (EAttrs.em 0.35)
+        , textAnchor "middle"
         ]
         [ text label ]
 
@@ -76,10 +75,10 @@ view model =
                     )
                 |> Array.fromList
     in
-    svg [ viewBox 0 0 w h ]
+    svg [ EAttrs.viewBox 0 0 w h ]
         [ g
-            [ transform [ Translate (w / 2) (h / 2) ]
-            , fontSize (px <| min w h / 20)
+            [ transform <| EAttrs.translate (w / 2) (h / 2)
+            , fontSize (EAttrs.px <| min w h / 20)
             ]
             [ g [] <| List.indexedMap (pieSlice colors) pieData
             , g [] <| List.map2 pieLabel pieData model

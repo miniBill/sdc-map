@@ -19,13 +19,12 @@ import RemoteData exposing (RemoteData(..), WebData)
 import Result.Extra
 import Round
 import Set exposing (Set)
+import Svg exposing (Svg)
+import Svg.Attributes as SAttrs
+import Svg.Attributes.Extra as EAttrs
 import Task
 import Theme
 import Theme.Dashboard as Theme
-import TypedSvg as Svg
-import TypedSvg.Attributes as SAttrs
-import TypedSvg.Core exposing (Svg)
-import TypedSvg.Types as STypes
 import Types exposing (Input)
 
 
@@ -390,21 +389,21 @@ viewMap model locations =
                     winkelWidth / imageRatio
             in
             Svg.image
-                [ SAttrs.href "world.jpg"
-                , SAttrs.width <| STypes.percent 100
-                , SAttrs.height <| STypes.px height
-                , SAttrs.x <| STypes.percent -50
-                , SAttrs.y <| (STypes.px <| -height / 2)
+                [ EAttrs.href "world.jpg"
+                , SAttrs.width <| EAttrs.percent 100
+                , SAttrs.height <| EAttrs.px height
+                , SAttrs.x <| EAttrs.percent -50
+                , SAttrs.y <| (EAttrs.px <| -height / 2)
                 ]
                 []
 
         viewPoint : ( ( Float, Float ), List String ) -> Svg msg
         viewPoint ( ( x, y ), names ) =
             Svg.circle
-                [ SAttrs.cx (STypes.px x)
-                , SAttrs.cy (STypes.px y)
-                , SAttrs.r (STypes.px 0.01)
-                , SAttrs.fill (STypes.Paint Color.red)
+                [ SAttrs.cx (EAttrs.px x)
+                , SAttrs.cy (EAttrs.px y)
+                , SAttrs.r (EAttrs.px 0.01)
+                , SAttrs.fill (EAttrs.color Color.red)
                 ]
                 [ Svg.title [] [ Html.text <| String.join ", " names ] ]
 
@@ -458,7 +457,7 @@ viewMap model locations =
         |> Svg.svg
             [ Html.Attributes.style "width"
                 ("calc(100vw - " ++ String.fromInt (Theme.rythm * 4 + 4) ++ "px)")
-            , SAttrs.viewBox -east -north (2 * east) (2 * north)
+            , EAttrs.viewBox -east -north (2 * east) (2 * north)
             ]
         |> Element.html
 
@@ -495,9 +494,9 @@ viewCountryBorders country geometry =
                     List.concatMap go children
     in
     Svg.g
-        [ SAttrs.fill <| STypes.Paint <| countryColor country
-        , SAttrs.stroke <| STypes.Paint Color.black
-        , SAttrs.strokeWidth <| STypes.px 0.0015
+        [ SAttrs.fill <| EAttrs.color <| countryColor country
+        , SAttrs.stroke <| EAttrs.color Color.black
+        , SAttrs.strokeWidth <| EAttrs.px 0.0015
         ]
         (go geometry)
 
@@ -556,7 +555,7 @@ viewPolygon points =
     in
     if count >= 5 then
         Svg.polygon
-            [ SAttrs.points projected
+            [ EAttrs.points projected
             ]
             [-- Html.text <| String.fromInt count
             ]

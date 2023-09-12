@@ -406,23 +406,43 @@ viewMap model locations =
                 , SAttrs.fill (STypes.Paint Color.red)
                 ]
                 [ Svg.title [] [ Html.text <| String.join ", " names ] ]
-    in
-    locations
-        |> List.filterMap
-            (\input ->
-                case findPosition model input of
-                    Ok pos ->
-                        Just <| viewPoint ( winkelTripel pos, input.names )
 
-                    Err _ ->
-                        case findPosition model { input | location = "" } of
+        countries : List Country
+        countries =
+            locations
+                |> List.map .country
+                |> Set.fromList
+                |> Set.toList
+
+        countriesBorders : Svg msg
+        countriesBorders =
+            countries
+                |> List.filterMap (\country -> Nothing)
+                |> Svg.g []
+
+        locationDots : Svg msg
+        locationDots =
+            locations
+                |> List.filterMap
+                    (\input ->
+                        case findPosition model input of
                             Ok pos ->
                                 Just <| viewPoint ( winkelTripel pos, input.names )
 
                             Err _ ->
-                                Nothing
-            )
-        |> (::) background
+                                case findPosition model { input | location = "" } of
+                                    Ok pos ->
+                                        Just <| viewPoint ( winkelTripel pos, input.names )
+
+                                    Err _ ->
+                                        Nothing
+                    )
+                |> Svg.g []
+    in
+    [ background
+    , countriesBorders
+    , locationDots
+    ]
         |> Svg.svg
             [ Html.Attributes.style "width"
                 ("calc(100vw - " ++ String.fromInt (Theme.rythm * 4 + 4) ++ "px)")

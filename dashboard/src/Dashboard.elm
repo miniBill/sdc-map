@@ -417,7 +417,18 @@ viewMap model locations =
         countriesBorders : Svg msg
         countriesBorders =
             countries
-                |> List.filterMap (\country -> Nothing)
+                |> List.filterMap
+                    (\country ->
+                        case Dict.get country model.geoJsonData of
+                            Just (Success countryLocations) ->
+                                List.Extra.find
+                                    (\location -> location.name == country)
+                                    countryLocations
+                                    |> Maybe.map (.geometry >> viewCountryBorders)
+
+                            _ ->
+                                Nothing
+                    )
                 |> Svg.g []
 
         locationDots : Svg msg
@@ -449,6 +460,58 @@ viewMap model locations =
             , SAttrs.viewBox -east -north (2 * east) (2 * north)
             ]
         |> Element.html
+
+
+viewCountryBorders : Geometry -> Svg msg
+viewCountryBorders geometry =
+    case geometry of
+        Point p ->
+            let
+                ( cx, cy ) =
+                    winkelTripelFlip p
+            in
+            Svg.circle
+                [ SAttrs.cx <| STypes.px cx
+                , SAttrs.cy <| STypes.px cy
+                , SAttrs.r <| STypes.px 10
+                ]
+                []
+
+        MultiPoint points ->
+            points
+                |> List.map (Point >> viewCountryBorders)
+                |> Svg.g []
+
+        LineString _ ->
+            Svg.text_ [] [ Html.text "branch 'LineString _' not implemented" ]
+
+        MultiLineString _ ->
+            Svg.text_ [] [ Html.text "branch 'MultiLineString _' not implemented" ]
+
+        Polygon [ points ] ->
+            Svg.polygon
+                [ SAttrs.points <| List.map winkelTripelFlip points
+                , SAttrs.fill <| STypes.Paint <| Color.rgba 1 0 0 0.2
+                ]
+                []
+
+        Polygon [] ->
+            Html.text ""
+
+        Polygon polygons ->
+            polygons
+                |> List.map (List.singleton >> Polygon >> viewCountryBorders)
+                |> Svg.g []
+
+        MultiPolygon polygons ->
+            polygons
+                |> List.map (Polygon >> viewCountryBorders)
+                |> Svg.g []
+
+        GeometryCollection children ->
+            children
+                |> List.map viewCountryBorders
+                |> Svg.g []
 
 
 winkelTripelFlip : Position -> ( Float, Float )

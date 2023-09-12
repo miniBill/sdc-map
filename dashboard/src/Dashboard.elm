@@ -520,6 +520,25 @@ viewCountryBorders country geometry =
 viewPolygon : List Position -> Svg msg
 viewPolygon points =
     let
+        roundish2 : Float -> ( Float, Float ) -> ( Float, Float )
+        roundish2 digits ( x, y ) =
+            ( roundish digits x
+            , roundish digits y
+            )
+
+        roundish : Float -> Float -> Float
+        roundish digits v =
+            let
+                k : Float
+                k =
+                    10 ^ digits
+            in
+            ((v * k)
+                |> round
+                |> toFloat
+            )
+                / k
+
         ( projected, count ) =
             case
                 points
@@ -550,11 +569,12 @@ viewPolygon points =
                                 ( last :: acc, countAcc )
                            )
     in
-    if count > 1 then
+    if count >= 5 then
         Svg.polygon
             [ SAttrs.points projected
             ]
-            []
+            [-- Html.text <| String.fromInt count
+            ]
 
     else
         Html.text ""
@@ -610,28 +630,7 @@ winkelTripel ( long, lat, _ ) =
         y =
             0.5 * (φ + sin φ / sinc α)
     in
-    roundish2 5 ( x, y )
-
-
-roundish2 : Float -> ( Float, Float ) -> ( Float, Float )
-roundish2 digits ( x, y ) =
-    ( roundish digits x
-    , roundish digits y
-    )
-
-
-roundish : Float -> Float -> Float
-roundish digits v =
-    let
-        k : Float
-        k =
-            10 ^ digits
-    in
-    ((v * k)
-        |> round
-        |> toFloat
-    )
-        / k
+    ( x, y )
 
 
 sinc : Float -> Float

@@ -15,13 +15,13 @@ import Types
 
 type Model
     = WaitingInput { input : String, error : Maybe String }
-    | Dashboard Dashboard.Model
+    | Dashboard Types.Model
 
 
 type Msg
     = Input String
     | Load
-    | DashboardMsg Dashboard.Msg
+    | DashboardMsg Types.Msg
 
 
 main : Program () Model Msg

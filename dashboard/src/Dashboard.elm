@@ -1,56 +1,26 @@
-module Dashboard exposing (Country, Location, Model, Msg, init, update, view)
+module Dashboard exposing (init, update, view)
 
-import Color exposing (Color)
 import Dict exposing (Dict)
 import Element exposing (Element, alignTop, centerX, el, fill, paragraph, px, rgb, shrink, text, width, wrappedRow)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
-import FNV1a
 import File.Download
 import GeoJson exposing (GeoJsonObject(..), Geometry(..), Position)
 import Http
 import Http.Tasks
 import Json.Decode exposing (Decoder)
 import List.Extra
+import Map
 import Pie
-import RemoteData exposing (RemoteData(..), WebData)
+import RemoteData exposing (RemoteData(..))
 import Result.Extra
 import Round
-import Set exposing (Set)
-import Svg.String as Svg exposing (Svg)
-import Svg.String.Attributes as SAttrs
-import Svg.String.Attributes.Extra as EAttrs
+import Set
 import Task
 import Theme
 import Theme.Dashboard as Theme
-import Types exposing (Input)
-
-
-type Msg
-    = InvalidCaptchas (Set String)
-    | GotIndexData (Result Http.Error (Dict Country { threeLetterCode : String, level : Int }))
-    | GotCapitalsData (Result Http.Error (Dict Country Position))
-    | GotGeoJson Country (Result (Maybe Http.Error) (List Location))
-    | ReloadCountry Country
-    | Download { name : String, content : String }
-
-
-type alias Model =
-    { invalidCaptchas : Set String
-    , inputs : List Input
-    , indexData : WebData (Dict Country { threeLetterCode : String, level : Int })
-    , geoJsonData : Dict Country (RemoteData (Maybe Http.Error) (List Location))
-    , capitals : WebData (Dict Country Position)
-    }
-
-
-type alias Location =
-    { name : String
-    , alternativeNames : List String
-    , geometry : Geometry
-    , center : Position
-    }
+import Types exposing (Country, Input, Location, Model, Msg(..))
 
 
 init : List Input -> ( Model, Cmd Msg )
@@ -139,10 +109,6 @@ indexDataDecoder =
         )
 
 
-type alias Country =
-    String
-
-
 view : Model -> Element Msg
 view model =
     let
@@ -214,7 +180,7 @@ viewOnMap model =
                 , Theme.tableColumnText "Location" .location
                 , Theme.tableColumnText "Found?" <|
                     \input ->
-                        case findPosition model input of
+                        case Types.findPosition model input of
                             Ok ( lon, lat, _ ) ->
                                 let
                                     i : String
@@ -229,7 +195,7 @@ viewOnMap model =
                                 "Err: " ++ e
                 ]
             }
-    , map = viewMap model locations
+    , map = Map.view model locations
     }
 
 
@@ -352,375 +318,6 @@ geodataUrl threeLetterCode lvl =
         ++ "_"
         ++ String.fromInt lvl
         ++ ".json"
-
-
-viewMap : Model -> List { country : String, location : String, names : List String } -> Element Msg
-viewMap model locations =
-    let
-        east : Float
-        east =
-            Tuple.first <| winkelTripel ( 180, 0, 0 )
-
-        north : Float
-        north =
-            Tuple.second <| winkelTripel ( 0, 90, 0 )
-
-        background : Svg msg
-        background =
-            let
-                winkelWidth : Float
-                winkelWidth =
-                    2 * east
-
-                imageWidth : number
-                imageWidth =
-                    2058
-
-                imageHeight : number
-                imageHeight =
-                    1262
-
-                imageRatio : Float
-                imageRatio =
-                    imageWidth / imageHeight
-
-                height : Float
-                height =
-                    winkelWidth / imageRatio
-            in
-            Svg.node "image"
-                [ EAttrs.href "world.jpg"
-                , SAttrs.width <| EAttrs.percent 100
-                , SAttrs.height <| EAttrs.px height
-                , SAttrs.x <| EAttrs.percent -50
-                , SAttrs.y <| (EAttrs.px <| -height / 2)
-                ]
-                []
-
-        viewPoint : ( ( Float, Float ), List String ) -> Svg msg
-        viewPoint ( ( x, y ), names ) =
-            Svg.circle
-                [ SAttrs.cx (EAttrs.px x)
-                , SAttrs.cy (EAttrs.px y)
-                , SAttrs.r (EAttrs.percent 0.2)
-                ]
-                [ Svg.node "title" [] [ Svg.text <| String.join ", " names ] ]
-
-        countries : List Country
-        countries =
-            locations
-                |> List.map .country
-                |> Set.fromList
-                |> Set.toList
-
-        countriesBorders : Svg msg
-        countriesBorders =
-            countries
-                |> List.filterMap
-                    (\country ->
-                        case Dict.get country model.geoJsonData of
-                            Just (Success countryLocations) ->
-                                List.Extra.find
-                                    (\location -> location.name == country)
-                                    countryLocations
-                                    |> Maybe.map (\{ geometry } -> viewCountryBorders country geometry)
-
-                            _ ->
-                                Nothing
-                    )
-                |> Svg.g
-                    [ SAttrs.stroke <| EAttrs.color Color.black
-                    , SAttrs.strokeWidth <| EAttrs.percent 0.02
-                    ]
-
-        locationDots : Svg msg
-        locationDots =
-            locations
-                |> List.filterMap
-                    (\input ->
-                        case findPosition model input of
-                            Ok pos ->
-                                Just <| viewPoint ( winkelTripelFlip pos, input.names )
-
-                            Err _ ->
-                                case findPosition model { input | location = "" } of
-                                    Ok pos ->
-                                        Just <| viewPoint ( winkelTripelFlip pos, input.names )
-
-                                    Err _ ->
-                                        Nothing
-                    )
-                |> Svg.g
-                    [ SAttrs.fill (EAttrs.color Color.red)
-                    ]
-
-        map : List (Svg.Attribute msg) -> Svg.Html msg
-        map attrs =
-            [ background
-            , countriesBorders
-            , locationDots
-            ]
-                |> Svg.svg
-                    (EAttrs.viewBox -east -north (2 * east) (2 * north)
-                        :: attrs
-                    )
-    in
-    Theme.column []
-        [ map
-            [ SAttrs.attribute "style" <|
-                "width: calc(100vw - "
-                    ++ EAttrs.px (Theme.rythm * 4 + 4)
-                    ++ ")"
-            ]
-            |> Svg.toHtml
-            |> Element.html
-        , Theme.button []
-            { onPress =
-                Just <|
-                    Download
-                        { name = "map.svg"
-                        , content =
-                            map
-                                [ SAttrs.attribute "xmlns" "http://www.w3.org/2000/svg"
-                                ]
-                                |> Svg.toString 2
-                                |> String.replace "view-box" "viewBox"
-                        }
-            , label = text "Download"
-            }
-        ]
-
-
-viewCountryBorders : String -> Geometry -> Svg msg
-viewCountryBorders country geometry =
-    let
-        go : Geometry -> List (Svg msg)
-        go child =
-            case child of
-                Point _ ->
-                    []
-
-                MultiPoint _ ->
-                    []
-
-                LineString _ ->
-                    [ Svg.text_ [] [ Svg.text "branch 'LineString _' not implemented" ] ]
-
-                MultiLineString _ ->
-                    [ Svg.text_ [] [ Svg.text "branch 'MultiLineString _' not implemented" ] ]
-
-                Polygon polygons ->
-                    List.map
-                        viewPolygon
-                        polygons
-
-                MultiPolygon polygons ->
-                    polygons
-                        |> List.concat
-                        |> List.map viewPolygon
-
-                GeometryCollection children ->
-                    List.concatMap go children
-    in
-    Svg.g
-        [ SAttrs.fill <| EAttrs.color <| countryColor country
-        ]
-        (go geometry)
-
-
-viewPolygon : List Position -> Svg msg
-viewPolygon points =
-    let
-        roundish2 : Float -> ( Float, Float ) -> ( Float, Float )
-        roundish2 digits ( x, y ) =
-            ( roundish digits x
-            , roundish digits y
-            )
-
-        roundish : Float -> Float -> Float
-        roundish digits v =
-            let
-                k : Float
-                k =
-                    10 ^ digits
-            in
-            ((v * k)
-                |> round
-                |> toFloat
-            )
-                / k
-
-        ( projected, count ) =
-            case
-                points
-                    |> List.map winkelTripelFlip
-            of
-                [] ->
-                    ( [], 0 )
-
-                head :: tail ->
-                    List.foldl
-                        (\e ( last, acc, countAcc ) ->
-                            if e == last then
-                                ( last, acc, countAcc )
-
-                            else
-                                ( e
-                                , last :: acc
-                                , if roundish2 2 e == roundish2 2 last then
-                                    countAcc
-
-                                  else
-                                    countAcc + 1
-                                )
-                        )
-                        ( head, [], 0 )
-                        tail
-                        |> (\( last, acc, countAcc ) ->
-                                ( last :: acc, countAcc )
-                           )
-    in
-    if count >= 5 then
-        Svg.node "polygon"
-            [ EAttrs.points projected
-            ]
-            [-- Html.text <| String.fromInt count
-            ]
-
-    else
-        Svg.text ""
-
-
-countryColor : String -> Color
-countryColor country =
-    let
-        hash : Int
-        hash =
-            FNV1a.hash country
-
-        ( r, g, b ) =
-            ( div (hash // (256 * 256))
-            , div (hash // 256)
-            , div (hash // 1)
-            )
-
-        div : Int -> Float
-        div n =
-            toFloat (modBy 256 n) / 255
-    in
-    Color.rgba r g b 0.4
-
-
-winkelTripelFlip : Position -> ( Float, Float )
-winkelTripelFlip pos =
-    let
-        ( x, y ) =
-            winkelTripel pos
-    in
-    ( x, -y )
-
-
-winkelTripel : Position -> ( Float, Float )
-winkelTripel ( long, lat, _ ) =
-    let
-        lambda : Float
-        lambda =
-            degrees long
-
-        φ : Float
-        φ =
-            degrees lat
-
-        α : Float
-        α =
-            acos (cos φ * cos (lambda / 2))
-
-        φ_1 : Float
-        φ_1 =
-            acos (2 / pi)
-
-        x : Float
-        x =
-            0.5 * (lambda * cos φ_1 + 2 * (cos φ * sin (lambda / 2)) / sinc α)
-
-        y : Float
-        y =
-            0.5 * (φ + sin φ / sinc α)
-    in
-    ( x * 1000, y * 1000 )
-
-
-sinc : Float -> Float
-sinc x =
-    if x == 0 then
-        1
-
-    else
-        sin x / x
-
-
-findPosition : Model -> { a | country : String, location : String } -> Result String Position
-findPosition model { country, location } =
-    if String.isEmpty location then
-        case model.capitals of
-            Loading ->
-                Err "Loading"
-
-            Failure _ ->
-                Err "Failure"
-
-            Success capitals ->
-                case Dict.get country capitals of
-                    Nothing ->
-                        Err "Missing (capitals)"
-
-                    Just capital ->
-                        Ok capital
-
-    else
-        case Dict.get (normalizeCountry country) model.geoJsonData of
-            Nothing ->
-                Err "Missing (data)"
-
-            Just Loading ->
-                Err "Loading"
-
-            Just (Failure Nothing) ->
-                Err "Missing (index)"
-
-            Just (Failure _) ->
-                Err "Failure"
-
-            Just (Success locations) ->
-                case locations of
-                    [] ->
-                        Err "No jsons loaded"
-
-                    _ ->
-                        let
-                            normalized : String
-                            normalized =
-                                normalize location
-
-                            normalize : String -> String
-                            normalize s =
-                                String.toLower s |> String.replace " " ""
-                        in
-                        locations
-                            |> List.Extra.findMap
-                                (\loc ->
-                                    if
-                                        (normalize loc.name == normalized)
-                                            || List.member
-                                                normalized
-                                                (List.map normalize loc.alternativeNames)
-                                    then
-                                        Just (Ok loc.center)
-
-                                    else
-                                        Nothing
-                                )
-                            |> Maybe.withDefault (Err "Not found")
 
 
 httpErrorToString : Http.Error -> String
@@ -884,7 +481,7 @@ update msg model =
                     model.inputs
                         |> List.map
                             (.country
-                                >> normalizeCountry
+                                >> Types.normalizeCountry
                             )
                         |> Set.fromList
                         |> Set.toList
@@ -915,11 +512,6 @@ update msg model =
 
         Download { name, content } ->
             ( model, File.Download.string name "image/svg+xml" content )
-
-
-normalizeCountry : String -> String
-normalizeCountry =
-    String.replace "UK" "United Kingdom"
 
 
 loadCountry : Model -> Country -> Cmd Msg

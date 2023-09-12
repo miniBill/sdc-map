@@ -146,13 +146,13 @@ type alias Country =
 view : Model -> Element Msg
 view model =
     let
-        { onMap, geoData, locations, map } =
+        { onMap, locations, map } =
             viewOnMap model
     in
     [ card "Statistics by country" <| viewByCountry model
     , Theme.column [ alignTop ]
         [ card "Captchas" <| viewCaptchas model
-        , card "GeoData" geoData
+        , card "GeoData" <| viewGeoDataTable model
         ]
     , card "On map" onMap
     , card "Locations" locations
@@ -171,7 +171,6 @@ viewOnMap :
     Model
     ->
         { onMap : Element msg
-        , geoData : Element Msg
         , locations : Element msg
         , map : Element msg
         }
@@ -182,9 +181,61 @@ viewOnMap model =
             validInputs model
                 |> List.filter
                     (\{ nameOnMap } ->
-                        (nameOnMap == Just True)
+                        nameOnMap == Just True
                     )
 
+        locations : List { country : String, location : String, names : List String }
+        locations =
+            filteredInputs
+                |> List.Extra.gatherEqualsBy (\{ country, location } -> ( country, location ))
+                |> List.map
+                    (\( { country, location, name }, others ) ->
+                        { country = country
+                        , location = location
+                        , names = name :: List.map .name others
+                        }
+                    )
+                |> List.sortBy (\{ country, location } -> ( country, location ))
+    in
+    { onMap =
+        Theme.table [ alignTop ]
+            { data = filteredInputs
+            , columns =
+                [ Theme.tableColumnText "Name" .name
+                , Theme.tableColumnText "Country" .country
+                , Theme.tableColumnText "Location" .location
+                ]
+            }
+    , locations =
+        Theme.table []
+            { data = locations
+            , columns =
+                [ Theme.tableColumnText "Country" .country
+                , Theme.tableColumnText "Location" .location
+                , Theme.tableColumnText "Found?" <|
+                    \input ->
+                        case findPosition model input of
+                            Ok ( lon, lat, _ ) ->
+                                let
+                                    i : String
+                                    i =
+                                        [ lon, lat ]
+                                            |> List.map (Round.round 4)
+                                            |> String.join ", "
+                                in
+                                "(" ++ i ++ ")"
+
+                            Err e ->
+                                "Err: " ++ e
+                ]
+            }
+    , map = viewMap model locations
+    }
+
+
+viewGeoDataTable : Model -> Element Msg
+viewGeoDataTable model =
+    let
         needed : List String
         needed =
             model.geoJsonData
@@ -215,124 +266,89 @@ viewOnMap model =
                     )
                 |> List.concat
 
-        locations : List { country : String, location : String, names : List String }
-        locations =
-            filteredInputs
-                |> List.Extra.gatherEqualsBy (\{ country, location } -> ( country, location ))
-                |> List.map
-                    (\( { country, location, name }, others ) ->
-                        { country = country
-                        , location = location
-                        , names = name :: List.map .name others
-                        }
-                    )
-                |> List.sortBy (\{ country, location } -> ( country, location ))
-    in
-    { onMap =
-        Theme.table [ alignTop ]
-            { data = filteredInputs
-            , columns =
-                [ Theme.tableColumnText "Name" .name
-                , Theme.tableColumnText "Country" .country
-                , Theme.tableColumnText "Location" .location
-                ]
-            }
-    , geoData =
-        Theme.column [ alignTop ]
-            [ case model.indexData of
-                Loading ->
-                    text "Loading index data..."
+        columns : List (Maybe (Theme.Column ( Country, RemoteData (Maybe Http.Error) (List Location) ) Msg))
+        columns =
+            [ Just <| Theme.tableColumnText "Country" Tuple.first
+            , Just <|
+                Theme.tableColumnText "Status" <|
+                    \( _, geoJson ) ->
+                        case geoJson of
+                            Failure (Just e) ->
+                                httpErrorToString e
 
-                Failure e ->
-                    text <| httpErrorToString e
+                            Failure Nothing ->
+                                "Not found in index"
 
-                Success _ ->
-                    text "Loaded index data."
-            , Theme.table []
-                { data = Dict.toList model.geoJsonData
-                , columns =
-                    [ Just <| Theme.tableColumnText "Country" Tuple.first
-                    , Just <|
-                        Theme.tableColumnText "Status" <|
-                            \( _, geoJson ) ->
-                                case geoJson of
-                                    Failure (Just e) ->
-                                        httpErrorToString e
+                            Loading ->
+                                "Loading..."
 
-                                    Failure Nothing ->
-                                        "Not found in index"
-
-                                    Loading ->
-                                        "Loading..."
-
-                                    Success _ ->
-                                        "Loaded"
-                    , if List.isEmpty needed then
-                        Nothing
-
-                      else
-                        { header = "Commands"
-                        , width = shrink
-                        , view =
-                            \( country, geoJson ) ->
-                                case geoJson of
-                                    Failure (Just _) ->
-                                        ( []
-                                        , Theme.button []
-                                            { label =
-                                                case
-                                                    model.indexData
-                                                        |> RemoteData.toMaybe
-                                                        |> Maybe.withDefault Dict.empty
-                                                        |> Dict.get country
-                                                of
-                                                    Nothing ->
-                                                        text "Reload"
-
-                                                    Just { threeLetterCode } ->
-                                                        text <| "Reload " ++ threeLetterCode
-                                            , onPress = Just (ReloadCountry country)
-                                            }
-                                        )
-
-                                    _ ->
-                                        ( [], Element.none )
-                        }
-                            |> Just
-                    ]
-                        |> List.filterMap identity
-                }
-            , if List.isEmpty needed then
-                Element.none
-
-              else
-                paragraph [] [ text <| String.join " " <| "make -j" :: needed ]
+                            Success _ ->
+                                "Loaded"
+            , commandsColumn
             ]
-    , locations =
-        Theme.table []
-            { data = locations
-            , columns =
-                [ Theme.tableColumnText "Country" .country
-                , Theme.tableColumnText "Location" .location
-                , Theme.tableColumnText "Found?" <|
-                    \input ->
-                        case findPosition model input of
-                            Ok ( lon, lat, _ ) ->
-                                let
-                                    i : String
-                                    i =
-                                        [ lon, lat ]
-                                            |> List.map (Round.round 4)
-                                            |> String.join ", "
-                                in
-                                "(" ++ i ++ ")"
 
-                            Err e ->
-                                "Err: " ++ e
-                ]
+        commandsColumn :
+            Maybe
+                (Theme.Column
+                    ( Country
+                    , RemoteData (Maybe Http.Error) (List Location)
+                    )
+                    Msg
+                )
+        commandsColumn =
+            if List.isEmpty needed then
+                Nothing
+
+            else
+                { header = "Commands"
+                , width = shrink
+                , view =
+                    \( country, geoJson ) ->
+                        case geoJson of
+                            Failure (Just _) ->
+                                ( []
+                                , Theme.button []
+                                    { label =
+                                        case
+                                            model.indexData
+                                                |> RemoteData.toMaybe
+                                                |> Maybe.withDefault Dict.empty
+                                                |> Dict.get country
+                                        of
+                                            Nothing ->
+                                                text "Reload"
+
+                                            Just { threeLetterCode } ->
+                                                text <| "Reload " ++ threeLetterCode
+                                    , onPress = Just (ReloadCountry country)
+                                    }
+                                )
+
+                            _ ->
+                                ( [], Element.none )
+                }
+                    |> Just
+    in
+    Theme.column [ alignTop ]
+        [ case model.indexData of
+            Loading ->
+                text "Loading index data..."
+
+            Failure e ->
+                text <| httpErrorToString e
+
+            Success _ ->
+                text "Loaded index data."
+        , Theme.table []
+            { data = Dict.toList model.geoJsonData
+            , columns = List.filterMap identity columns
             }
-    , map = viewMap model locations
-    }
+        , if List.isEmpty needed then
+            Element.none
+
+          else
+            paragraph [] [ text <| String.join " " <| "make -j" :: needed ]
+        ]
 
 
 viewMap : Model -> List { country : String, location : String, names : List String } -> Element msg
@@ -396,7 +412,12 @@ viewMap model locations =
                         Just <| viewPoint ( winkelTripel pos, input.names )
 
                     Err _ ->
-                        Nothing
+                        case findPosition model { input | location = "" } of
+                            Ok pos ->
+                                Just <| viewPoint ( winkelTripel pos, input.names )
+
+                            Err _ ->
+                                Nothing
             )
         |> (::) background
         |> Svg.svg

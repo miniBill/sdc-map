@@ -620,7 +620,7 @@ winkelTripel ( long, lat, _ ) =
         y =
             0.5 * (φ + sin φ / sinc α)
     in
-    ( x, y )
+    ( x * 1000, y * 1000 )
 
 
 sinc : Float -> Float

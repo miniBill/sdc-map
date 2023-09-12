@@ -173,14 +173,14 @@ viewCountryBorders country geometry =
                     [ Svg.text_ [] [ Svg.text "branch 'MultiLineString _' not implemented" ] ]
 
                 Polygon polygons ->
-                    List.map
+                    List.filterMap
                         viewPolygon
                         polygons
 
                 MultiPolygon polygons ->
                     polygons
                         |> List.concat
-                        |> List.map viewPolygon
+                        |> List.filterMap viewPolygon
 
                 GeometryCollection children ->
                     List.concatMap go children
@@ -192,7 +192,7 @@ viewCountryBorders country geometry =
         (go geometry)
 
 
-viewPolygon : List Position -> Svg msg
+viewPolygon : List Position -> Maybe (Svg msg)
 viewPolygon points =
     let
         roundish2 : Float -> ( Float, Float ) -> ( Float, Float )
@@ -215,10 +215,7 @@ viewPolygon points =
                 / k
 
         ( projected, count ) =
-            case
-                points
-                    |> List.map winkelTripelFlip
-            of
+            case List.map winkelTripelFlip points of
                 [] ->
                     ( [], 0 )
 
@@ -250,9 +247,10 @@ viewPolygon points =
             ]
             [-- Html.text <| String.fromInt count
             ]
+            |> Just
 
     else
-        Svg.text ""
+        Nothing
 
 
 countryColor : String -> Color

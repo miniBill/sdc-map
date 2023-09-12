@@ -497,14 +497,14 @@ viewCountryBorders country geometry =
                     [ Svg.text_ [] [ Html.text "branch 'MultiLineString _' not implemented" ] ]
 
                 Polygon polygons ->
-                    List.filterMap
+                    List.map
                         viewPolygon
                         polygons
 
                 MultiPolygon polygons ->
                     polygons
                         |> List.concat
-                        |> List.filterMap viewPolygon
+                        |> List.map viewPolygon
 
                 GeometryCollection children ->
                     List.concatMap go children
@@ -517,40 +517,47 @@ viewCountryBorders country geometry =
         (go geometry)
 
 
-viewPolygon : List Position -> Maybe (Svg msg)
+viewPolygon : List Position -> Svg msg
 viewPolygon points =
     let
-        projected =
+        ( projected, count ) =
             case
                 points
                     |> List.map winkelTripelFlip
             of
                 [] ->
-                    []
+                    ( [], 0 )
 
                 head :: tail ->
                     List.foldl
-                        (\e ( last, acc ) ->
+                        (\e ( last, acc, countAcc ) ->
                             if e == last then
-                                ( last, acc )
+                                ( last, acc, countAcc )
 
                             else
-                                ( e, last :: acc )
-                        )
-                        ( head, [] )
-                        tail
-                        |> (\( last, acc ) -> last :: acc)
-    in
-    case projected of
-        _ :: _ :: _ ->
-            Svg.polygon
-                [ SAttrs.points projected
-                ]
-                []
-                |> Just
+                                ( e
+                                , last :: acc
+                                , if roundish2 2 e == roundish2 2 last then
+                                    countAcc
 
-        _ ->
-            Nothing
+                                  else
+                                    countAcc + 1
+                                )
+                        )
+                        ( head, [], 0 )
+                        tail
+                        |> (\( last, acc, countAcc ) ->
+                                ( last :: acc, countAcc )
+                           )
+    in
+    if count > 1 then
+        Svg.polygon
+            [ SAttrs.points projected
+            ]
+            []
+
+    else
+        Html.text ""
 
 
 countryColor : String -> Color
@@ -602,15 +609,29 @@ winkelTripel ( long, lat, _ ) =
 
         y =
             0.5 * (phi + sin phi / sinc alpha)
-
-        roundish v =
-            ((v * 10000)
-                |> round
-                |> toFloat
-            )
-                / 10000
     in
-    ( roundish x, roundish y )
+    roundish2 5 ( x, y )
+
+
+roundish2 : Float -> ( Float, Float ) -> ( Float, Float )
+roundish2 digits ( x, y ) =
+    ( roundish digits x
+    , roundish digits y
+    )
+
+
+roundish : Float -> Float -> Float
+roundish digits v =
+    let
+        k : Float
+        k =
+            10 ^ digits
+    in
+    ((v * k)
+        |> round
+        |> toFloat
+    )
+        / k
 
 
 sinc : Float -> Float

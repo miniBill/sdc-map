@@ -7,6 +7,7 @@ import FNV1a
 import GeoJson exposing (Geometry(..), Position)
 import List.Extra
 import RemoteData exposing (RemoteData(..))
+import Set
 import Svg.String as Svg exposing (Svg)
 import Svg.String.Attributes as SAttrs
 import Svg.String.Attributes.Extra as EAttrs
@@ -120,24 +121,30 @@ viewLocationDot ( ( x, y ), names ) =
 
 
 viewCountriesBorders : Model -> Svg msg
-viewCountriesBorders { geoJsonData } =
+viewCountriesBorders ({ geoJsonData } as model) =
+    let
+        countries =
+            Types.validInputs model
+                |> List.map .country
+                |> Set.fromList
+    in
     geoJsonData
         |> Dict.toList
         |> List.filterMap
             (\( country, data ) ->
-                let
-                    _ =
-                        Debug.log "country" country
-                in
-                case data of
-                    Success countryLocations ->
-                        List.Extra.find
-                            (\location -> location.name == country)
-                            countryLocations
-                            |> Maybe.map (\{ geometry } -> viewCountryBorders country geometry)
+                if Set.member country countries then
+                    case data of
+                        Success countryLocations ->
+                            List.Extra.find
+                                (\location -> location.name == country)
+                                countryLocations
+                                |> Maybe.map (\{ geometry } -> viewCountryBorders country geometry)
 
-                    _ ->
-                        Nothing
+                        _ ->
+                            Nothing
+
+                else
+                    Nothing
             )
         |> Svg.g
             [ SAttrs.stroke <| EAttrs.color Color.black

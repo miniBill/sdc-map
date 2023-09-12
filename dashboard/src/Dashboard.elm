@@ -21,7 +21,7 @@ import Svg.String
 import Svg.String.Attributes
 import Task
 import Theme
-import Types exposing (Country, Input, Location, Model, Msg(..))
+import Types exposing (Country, Input, Location, Model, Msg(..), validInputs)
 
 
 init : List Input -> ( Model, Cmd Msg )
@@ -126,12 +126,6 @@ view model =
     , card "Map" map
     ]
         |> wrappedRow [ Theme.spacing ]
-
-
-validInputs : Model -> List Input
-validInputs model =
-    model.inputs
-        |> List.filter (\{ captcha } -> not (Set.member (String.toLower captcha) model.invalidCaptchas))
 
 
 viewOnMap :

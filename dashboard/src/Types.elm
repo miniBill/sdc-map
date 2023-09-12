@@ -1,4 +1,4 @@
-module Types exposing (Country, Input, Location, Model, Msg(..), findPosition, inputCodec, normalizeCountry)
+module Types exposing (Country, Input, Location, Model, Msg(..), findPosition, inputCodec, normalizeCountry, validInputs)
 
 import Dict exposing (Dict)
 import GeoJson exposing (Geometry, Position)
@@ -137,3 +137,9 @@ findPosition model { country, location } =
 normalizeCountry : String -> String
 normalizeCountry =
     String.replace "UK" "United Kingdom"
+
+
+validInputs : Model -> List Input
+validInputs model =
+    model.inputs
+        |> List.filter (\{ captcha } -> not (Set.member (String.toLower captcha) model.invalidCaptchas))

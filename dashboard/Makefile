@@ -6,3 +6,4 @@ geodata/%.json.zip:
 
 geodata/%.json: geodata/%.json.zip
 	(cd geodata; unzip -q -o $*.json.zip)
+	touch $@

@@ -524,9 +524,7 @@ update msg model =
 
         Download ->
             let
-                name =
-                    "map.svg"
-
+                content : String
                 content =
                     Map.map model
                         (inputsToLocations <| inputsForMap model)
@@ -535,7 +533,7 @@ update msg model =
                         |> Svg.String.toString 2
                         |> String.replace "view-box" "viewBox"
             in
-            ( model, File.Download.string name "image/svg+xml" content )
+            ( model, File.Download.string "map.svg" "image/svg+xml" content )
 
 
 loadCountry : Model -> Country -> Cmd Msg
@@ -614,6 +612,7 @@ geoJsonDecoder =
 
 getCentroid : Geometry -> Position
 getCentroid geometry =
+    -- elm-review: IGNORE TCO
     let
         getMedian : List Position -> Position
         getMedian list =
@@ -670,6 +669,7 @@ nameDecoder =
     let
         decoderAtLevel : Int -> Decoder ( String, String )
         decoderAtLevel level =
+            -- elm-review: IGNORE TCO
             let
                 suffix : String
                 suffix =

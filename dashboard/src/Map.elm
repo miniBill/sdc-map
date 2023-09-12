@@ -7,7 +7,7 @@ import FNV1a
 import GeoJson exposing (Geometry(..), Position)
 import List.Extra
 import RemoteData exposing (RemoteData(..))
-import Set
+import Set exposing (Set)
 import Svg.String as Svg exposing (Svg)
 import Svg.String.Attributes as SAttrs
 import Svg.String.Attributes.Extra as EAttrs
@@ -78,8 +78,8 @@ viewBackground east =
         height =
             winkelWidth / imageRatio
     in
-    Svg.node "image"
-        [ EAttrs.href "world.jpg"
+    Svg.image
+        [ SAttrs.href "world.jpg"
         , SAttrs.width <| EAttrs.percent 100
         , SAttrs.height <| EAttrs.px height
         , SAttrs.x <| EAttrs.percent -50
@@ -117,12 +117,13 @@ viewLocationDot ( ( x, y ), names ) =
         , SAttrs.cy (EAttrs.px y)
         , SAttrs.r (EAttrs.percent 0.2)
         ]
-        [ Svg.node "title" [] [ Svg.text <| String.join ", " names ] ]
+        [ Svg.title [] [ Svg.text <| String.join ", " names ] ]
 
 
 viewCountriesBorders : Model -> Svg msg
 viewCountriesBorders ({ geoJsonData } as model) =
     let
+        countries : Set String
         countries =
             Types.validInputs model
                 |> List.map .country
@@ -157,6 +158,7 @@ viewCountryBorders country geometry =
     let
         go : Geometry -> List (Svg msg)
         go child =
+            -- elm-review: IGNORE TCO
             case child of
                 Point _ ->
                     []
@@ -185,6 +187,7 @@ viewCountryBorders country geometry =
     in
     Svg.g
         [ SAttrs.fill <| EAttrs.color <| countryColor country
+        , SAttrs.id country
         ]
         (go geometry)
 
@@ -242,8 +245,8 @@ viewPolygon points =
                            )
     in
     if count >= 5 then
-        Svg.node "polygon"
-            [ EAttrs.points projected
+        Svg.polygon
+            [ SAttrs.points <| EAttrs.points projected
             ]
             [-- Html.text <| String.fromInt count
             ]

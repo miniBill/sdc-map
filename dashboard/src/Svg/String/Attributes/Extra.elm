@@ -1,13 +1,8 @@
-module Svg.String.Attributes.Extra exposing (color, em, href, percent, points, px, translate, viewBox)
+module Svg.String.Attributes.Extra exposing (color, em, percent, points, px, translate, viewBox)
 
 import Color exposing (Color)
-import Svg.String as Svg exposing (Attribute)
+import Svg.String exposing (Attribute)
 import Svg.String.Attributes as SAttrs
-
-
-href : String -> Attribute msg
-href value =
-    SAttrs.attribute "href" value
 
 
 percent : Float -> String
@@ -38,12 +33,11 @@ viewBox x y width height =
         |> SAttrs.viewBox
 
 
-points : List ( Float, Float ) -> Svg.Attribute msg
+points : List ( Float, Float ) -> String
 points values =
     values
         |> List.map (\( x, y ) -> pointToString x y)
         |> String.join " "
-        |> SAttrs.attribute "points"
 
 
 pointToString : Float -> Float -> String

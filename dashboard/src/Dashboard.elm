@@ -7,6 +7,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import FNV1a
+import File.Download
 import GeoJson exposing (GeoJsonObject(..), Geometry(..), Position)
 import Http
 import Http.Tasks
@@ -32,6 +33,7 @@ type Msg
     | GotCapitalsData (Result Http.Error (Dict Country Position))
     | GotGeoJson Country (Result (Maybe Http.Error) (List Location))
     | ReloadCountry Country
+    | Download { name : String, content : String }
 
 
 type alias Model =
@@ -170,7 +172,7 @@ viewOnMap :
     ->
         { onMap : Element msg
         , locations : Element msg
-        , map : Element msg
+        , map : Element Msg
         }
 viewOnMap model =
     let
@@ -352,7 +354,7 @@ geodataUrl threeLetterCode lvl =
         ++ ".json"
 
 
-viewMap : Model -> List { country : String, location : String, names : List String } -> Element msg
+viewMap : Model -> List { country : String, location : String, names : List String } -> Element Msg
 viewMap model locations =
     let
         east : Float
@@ -401,7 +403,6 @@ viewMap model locations =
                 [ SAttrs.cx (EAttrs.px x)
                 , SAttrs.cy (EAttrs.px y)
                 , SAttrs.r (EAttrs.percent 0.2)
-                , SAttrs.fill (EAttrs.color Color.red)
                 ]
                 [ Svg.node "title" [] [ Svg.text <| String.join ", " names ] ]
 
@@ -427,7 +428,10 @@ viewMap model locations =
                             _ ->
                                 Nothing
                     )
-                |> Svg.g []
+                |> Svg.g
+                    [ SAttrs.stroke <| EAttrs.color Color.black
+                    , SAttrs.strokeWidth <| EAttrs.percent 0.02
+                    ]
 
         locationDots : Svg msg
         locationDots =
@@ -446,21 +450,45 @@ viewMap model locations =
                                     Err _ ->
                                         Nothing
                     )
-                |> Svg.g []
+                |> Svg.g
+                    [ SAttrs.fill (EAttrs.color Color.red)
+                    ]
+
+        map : List (Svg.Attribute msg) -> Svg.Html msg
+        map attrs =
+            [ background
+            , countriesBorders
+            , locationDots
+            ]
+                |> Svg.svg
+                    (EAttrs.viewBox -east -north (2 * east) (2 * north)
+                        :: attrs
+                    )
     in
-    [ background
-    , countriesBorders
-    , locationDots
-    ]
-        |> Svg.svg
+    Theme.column []
+        [ map
             [ SAttrs.attribute "style" <|
                 "width: calc(100vw - "
                     ++ EAttrs.px (Theme.rythm * 4 + 4)
                     ++ ")"
-            , EAttrs.viewBox -east -north (2 * east) (2 * north)
             ]
-        |> Svg.toHtml
-        |> Element.html
+            |> Svg.toHtml
+            |> Element.html
+        , Theme.button []
+            { onPress =
+                Just <|
+                    Download
+                        { name = "map.svg"
+                        , content =
+                            map
+                                [ SAttrs.attribute "xmlns" "http://www.w3.org/2000/svg"
+                                ]
+                                |> Svg.toString 2
+                                |> String.replace "view-box" "viewBox"
+                        }
+            , label = text "Download"
+            }
+        ]
 
 
 viewCountryBorders : String -> Geometry -> Svg msg
@@ -496,8 +524,6 @@ viewCountryBorders country geometry =
     in
     Svg.g
         [ SAttrs.fill <| EAttrs.color <| countryColor country
-        , SAttrs.stroke <| EAttrs.color Color.black
-        , SAttrs.strokeWidth <| EAttrs.percent 0.05
         ]
         (go geometry)
 
@@ -886,6 +912,9 @@ update msg model =
 
         ReloadCountry country ->
             ( model, loadCountry model country )
+
+        Download { name, content } ->
+            ( model, File.Download.string name "image/svg+xml" content )
 
 
 normalizeCountry : String -> String

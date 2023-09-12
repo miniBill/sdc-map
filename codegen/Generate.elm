@@ -20,8 +20,7 @@ file =
             (\{ name, subdivisions } ->
                 Elm.tuple
                     (name
-                        |> String.replace "United Kingdom of Great Britain and Northern Ireland" "UK"
-                        |> String.replace "United States of America" "USA"
+                        |> String.replace "United Kingdom of Great Britain and Northern Ireland" "United Kingdom"
                         |> Elm.string
                     )
                     (Elm.list <| List.map (Elm.string << .name) subdivisions)

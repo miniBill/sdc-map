@@ -403,7 +403,7 @@ viewMap model locations =
             Svg.circle
                 [ SAttrs.cx (STypes.px x)
                 , SAttrs.cy (STypes.px y)
-                , SAttrs.r (STypes.px 0.02)
+                , SAttrs.r (STypes.px 0.01)
                 , SAttrs.fill (STypes.Paint Color.red)
                 ]
                 [ Svg.title [] [ Html.text <| String.join ", " names ] ]

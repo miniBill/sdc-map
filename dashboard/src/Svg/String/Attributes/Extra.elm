@@ -7,7 +7,7 @@ import Svg.String.Attributes as SAttrs
 
 href : String -> Attribute msg
 href value =
-    SAttrs.xlinkHref value
+    SAttrs.attribute "href" value
 
 
 percent : Float -> String

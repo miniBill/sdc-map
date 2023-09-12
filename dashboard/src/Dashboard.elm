@@ -19,7 +19,6 @@ import Round
 import Set
 import Task
 import Theme
-import Theme.Dashboard as Theme
 import Types exposing (Country, Input, Location, Model, Msg(..))
 
 

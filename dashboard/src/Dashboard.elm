@@ -366,13 +366,13 @@ viewMap model locations =
         north =
             Tuple.second <| winkelTripel ( 0, 90, 0 )
 
-        winkelWidth : Float
-        winkelWidth =
-            2 * east
-
         background : Svg msg
         background =
             let
+                winkelWidth : Float
+                winkelWidth =
+                    2 * east
+
                 imageWidth : number
                 imageWidth =
                     2058
@@ -466,29 +466,14 @@ viewMap model locations =
 viewCountryBorders : String -> Geometry -> Svg msg
 viewCountryBorders country geometry =
     let
-        viewPoint p =
-            let
-                ( cx, cy ) =
-                    winkelTripelFlip p
-            in
-            Svg.circle
-                [ SAttrs.cx <| STypes.px cx
-                , SAttrs.cy <| STypes.px cy
-                , SAttrs.r <| STypes.px 10
-                , SAttrs.fill <| STypes.Paint <| countryColor country
-                ]
-                []
-
         go : Geometry -> List (Svg msg)
         go child =
             case child of
-                Point p ->
-                    [ viewPoint p ]
+                Point _ ->
+                    []
 
-                MultiPoint points ->
-                    List.map
-                        viewPoint
-                        points
+                MultiPoint _ ->
+                    []
 
                 LineString _ ->
                     [ Svg.text_ [] [ Html.text "branch 'LineString _' not implemented" ] ]
@@ -612,21 +597,27 @@ winkelTripelFlip pos =
 winkelTripel : Position -> ( Float, Float )
 winkelTripel ( long, lat, _ ) =
     let
+        lambda : Float
         lambda =
             degrees long
 
+        φ : Float
         φ =
             degrees lat
 
+        α : Float
         α =
             acos (cos φ * cos (lambda / 2))
 
+        φ_1 : Float
         φ_1 =
             acos (2 / pi)
 
+        x : Float
         x =
             0.5 * (lambda * cos φ_1 + 2 * (cos φ * sin (lambda / 2)) / sinc α)
 
+        y : Float
         y =
             0.5 * (φ + sin φ / sinc α)
     in

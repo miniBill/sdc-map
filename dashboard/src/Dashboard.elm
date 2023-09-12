@@ -402,7 +402,7 @@ viewMap model locations =
             Svg.circle
                 [ SAttrs.cx (EAttrs.px x)
                 , SAttrs.cy (EAttrs.px y)
-                , SAttrs.r (EAttrs.px 0.01)
+                , SAttrs.r (EAttrs.percent 0.2)
                 , SAttrs.fill (EAttrs.color Color.red)
                 ]
                 [ Svg.title [] [ Html.text <| String.join ", " names ] ]
@@ -496,7 +496,7 @@ viewCountryBorders country geometry =
     Svg.g
         [ SAttrs.fill <| EAttrs.color <| countryColor country
         , SAttrs.stroke <| EAttrs.color Color.black
-        , SAttrs.strokeWidth <| EAttrs.px 0.0015
+        , SAttrs.strokeWidth <| EAttrs.percent 0.05
         ]
         (go geometry)
 

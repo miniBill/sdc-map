@@ -595,20 +595,20 @@ winkelTripel ( long, lat, _ ) =
         lambda =
             degrees long
 
-        phi =
+        φ =
             degrees lat
 
-        alpha =
-            acos (cos phi * cos (lambda / 2))
+        α =
+            acos (cos φ * cos (lambda / 2))
 
-        phi_1 =
+        φ_1 =
             acos (2 / pi)
 
         x =
-            0.5 * (lambda * cos phi_1 + 2 * (cos phi * sin (lambda / 2)) / sinc alpha)
+            0.5 * (lambda * cos φ_1 + 2 * (cos φ * sin (lambda / 2)) / sinc α)
 
         y =
-            0.5 * (phi + sin phi / sinc alpha)
+            0.5 * (φ + sin φ / sinc α)
     in
     roundish2 5 ( x, y )
 

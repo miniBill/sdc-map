@@ -67,7 +67,7 @@ type Msg
     | GotCapitalsData (Result Http.Error (Dict Country Position))
     | GotGeoJson Country (Result (Maybe Http.Error) (List Location))
     | ReloadCountry Country
-    | Download { name : String, content : String }
+    | Download
 
 
 findPosition : Model -> { a | country : String, location : String } -> Result String Position

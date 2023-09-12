@@ -1,4 +1,4 @@
-module Map exposing (view)
+module Map exposing (map, view)
 
 import Color exposing (Color)
 import Dict
@@ -7,7 +7,6 @@ import FNV1a
 import GeoJson exposing (Geometry(..), Position)
 import List.Extra
 import RemoteData exposing (RemoteData(..))
-import Set
 import Svg.String as Svg exposing (Svg)
 import Svg.String.Attributes as SAttrs
 import Svg.String.Attributes.Extra as EAttrs
@@ -17,28 +16,9 @@ import Types exposing (Model, Msg(..))
 
 view : Model -> List { country : String, location : String, names : List String } -> Element Msg
 view model locations =
-    let
-        east : Float
-        east =
-            Tuple.first <| winkelTripel ( 180, 0, 0 )
-
-        north : Float
-        north =
-            Tuple.second <| winkelTripel ( 0, 90, 0 )
-
-        map : List (Svg.Attribute msg) -> Svg.Html msg
-        map attrs =
-            [ viewBackground east
-            , viewCountriesBorders model locations
-            , viewLocationDots model locations
-            ]
-                |> Svg.svg
-                    (EAttrs.viewBox -east -north (2 * east) (2 * north)
-                        :: attrs
-                    )
-    in
     Theme.column []
-        [ map
+        [ map model
+            locations
             [ SAttrs.attribute "style" <|
                 "width: calc(100vw - "
                     ++ EAttrs.px (Theme.rythm * 4 + 4)
@@ -47,20 +27,31 @@ view model locations =
             |> Svg.toHtml
             |> Element.html
         , Theme.button []
-            { onPress =
-                Just <|
-                    Download
-                        { name = "map.svg"
-                        , content =
-                            map
-                                [ SAttrs.attribute "xmlns" "http://www.w3.org/2000/svg"
-                                ]
-                                |> Svg.toString 2
-                                |> String.replace "view-box" "viewBox"
-                        }
+            { onPress = Just Download
             , label = text "Download"
             }
         ]
+
+
+map : Model -> List { country : String, location : String, names : List String } -> List (Svg.Attribute msg) -> Svg.Html msg
+map model locations attrs =
+    let
+        east : Float
+        east =
+            Tuple.first <| winkelTripel ( 180, 0, 0 )
+
+        north : Float
+        north =
+            Tuple.second <| winkelTripel ( 0, 90, 0 )
+    in
+    [ viewBackground east
+    , viewCountriesBorders model
+    , viewLocationDots model locations
+    ]
+        |> Svg.svg
+            (EAttrs.viewBox -east -north (2 * east) (2 * north)
+                :: attrs
+            )
 
 
 viewBackground : Float -> Svg msg
@@ -128,16 +119,18 @@ viewLocationDot ( ( x, y ), names ) =
         [ Svg.node "title" [] [ Svg.text <| String.join ", " names ] ]
 
 
-viewCountriesBorders : Model -> List { a | country : String } -> Svg msg
-viewCountriesBorders model locations =
-    locations
-        |> List.map .country
-        |> Set.fromList
-        |> Set.toList
+viewCountriesBorders : Model -> Svg msg
+viewCountriesBorders { geoJsonData } =
+    geoJsonData
+        |> Dict.toList
         |> List.filterMap
-            (\country ->
-                case Dict.get country model.geoJsonData of
-                    Just (Success countryLocations) ->
+            (\( country, data ) ->
+                let
+                    _ =
+                        Debug.log "country" country
+                in
+                case data of
+                    Success countryLocations ->
                         List.Extra.find
                             (\location -> location.name == country)
                             countryLocations

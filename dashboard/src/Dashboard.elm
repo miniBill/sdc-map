@@ -17,6 +17,8 @@ import RemoteData exposing (RemoteData(..))
 import Result.Extra
 import Round
 import Set
+import Svg.String
+import Svg.String.Attributes
 import Task
 import Theme
 import Types exposing (Country, Input, Location, Model, Msg(..))
@@ -141,30 +143,17 @@ viewOnMap :
         }
 viewOnMap model =
     let
-        filteredInputs : List Input
-        filteredInputs =
-            validInputs model
-                |> List.filter
-                    (\{ nameOnMap } ->
-                        nameOnMap == Just True
-                    )
+        filtered : List Input
+        filtered =
+            inputsForMap model
 
         locations : List { country : String, location : String, names : List String }
         locations =
-            filteredInputs
-                |> List.Extra.gatherEqualsBy (\{ country, location } -> ( country, location ))
-                |> List.map
-                    (\( { country, location, name }, others ) ->
-                        { country = country
-                        , location = location
-                        , names = name :: List.map .name others
-                        }
-                    )
-                |> List.sortBy (\{ country, location } -> ( country, location ))
+            inputsToLocations filtered
     in
     { onMap =
         Theme.table [ alignTop ]
-            { data = filteredInputs
+            { data = filtered
             , columns =
                 [ Theme.tableColumnText "Name" .name
                 , Theme.tableColumnText "Country" .country
@@ -196,6 +185,36 @@ viewOnMap model =
             }
     , map = Map.view model locations
     }
+
+
+inputsForMap : Model -> List Input
+inputsForMap model =
+    validInputs model
+        |> List.filter
+            (\{ nameOnMap } ->
+                nameOnMap == Just True
+            )
+
+
+inputsToLocations :
+    List Input
+    ->
+        List
+            { country : Country
+            , location : String
+            , names : List String
+            }
+inputsToLocations filtered =
+    filtered
+        |> List.Extra.gatherEqualsBy (\{ country, location } -> ( country, location ))
+        |> List.map
+            (\( { country, location, name }, others ) ->
+                { country = country
+                , location = location
+                , names = name :: List.map .name others
+                }
+            )
+        |> List.sortBy (\{ country, location } -> ( country, location ))
 
 
 viewGeoDataTable : Model -> Element Msg
@@ -509,7 +528,19 @@ update msg model =
         ReloadCountry country ->
             ( model, loadCountry model country )
 
-        Download { name, content } ->
+        Download ->
+            let
+                name =
+                    "map.svg"
+
+                content =
+                    Map.map model
+                        (inputsToLocations <| inputsForMap model)
+                        [ Svg.String.Attributes.attribute "xmlns" "http://www.w3.org/2000/svg"
+                        ]
+                        |> Svg.String.toString 2
+                        |> String.replace "view-box" "viewBox"
+            in
             ( model, File.Download.string name "image/svg+xml" content )
 
 

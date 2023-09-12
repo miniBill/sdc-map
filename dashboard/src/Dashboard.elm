@@ -401,7 +401,7 @@ viewMap model locations =
         viewPoint ( ( x, y ), names ) =
             Svg.circle
                 [ SAttrs.cx (STypes.px x)
-                , SAttrs.cy (STypes.px -y)
+                , SAttrs.cy (STypes.px y)
                 , SAttrs.r (STypes.px 0.02)
                 , SAttrs.fill (STypes.Paint Color.red)
                 ]
@@ -427,12 +427,12 @@ viewMap model locations =
                     (\input ->
                         case findPosition model input of
                             Ok pos ->
-                                Just <| viewPoint ( winkelTripel pos, input.names )
+                                Just <| viewPoint ( winkelTripelFlip pos, input.names )
 
                             Err _ ->
                                 case findPosition model { input | location = "" } of
                                     Ok pos ->
-                                        Just <| viewPoint ( winkelTripel pos, input.names )
+                                        Just <| viewPoint ( winkelTripelFlip pos, input.names )
 
                                     Err _ ->
                                         Nothing
@@ -449,6 +449,15 @@ viewMap model locations =
             , SAttrs.viewBox -east -north (2 * east) (2 * north)
             ]
         |> Element.html
+
+
+winkelTripelFlip : Position -> ( Float, Float )
+winkelTripelFlip pos =
+    let
+        ( x, y ) =
+            winkelTripel pos
+    in
+    ( x, -y )
 
 
 winkelTripel : Position -> ( Float, Float )

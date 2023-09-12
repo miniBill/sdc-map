@@ -250,7 +250,7 @@ viewGeoDataTable model =
                                     |> Dict.get country
                                     |> Maybe.map
                                         (\{ threeLetterCode, level } ->
-                                            List.range 1 (level - 2)
+                                            List.range 0 (level - 2)
                                                 |> List.map
                                                     (geodataUrl threeLetterCode)
                                         )
@@ -735,7 +735,7 @@ loadCountry model country =
                         (Task.succeed (Err Nothing))
 
                 Just { threeLetterCode, level } ->
-                    List.range 1 (level - 2)
+                    List.range 0 (level - 2)
                         |> List.map
                             (\lvl ->
                                 Http.Tasks.get
@@ -877,4 +877,8 @@ nameDecoder =
                             ]
                     )
     in
-    decoderAtLevel 1
+    Json.Decode.oneOf
+        [ decoderAtLevel 1
+        , Json.Decode.map (\country -> ( country, "" )) <|
+            Json.Decode.field "COUNTRY" Json.Decode.string
+        ]

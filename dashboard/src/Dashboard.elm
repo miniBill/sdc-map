@@ -252,13 +252,7 @@ viewGeoDataTable model =
                                         (\{ threeLetterCode, level } ->
                                             List.range 1 (level - 2)
                                                 |> List.map
-                                                    (\lvl ->
-                                                        "geodata/gadm41_"
-                                                            ++ threeLetterCode
-                                                            ++ "_"
-                                                            ++ String.fromInt lvl
-                                                            ++ ".json"
-                                                    )
+                                                    (geodataUrl threeLetterCode)
                                         )
 
                             _ ->
@@ -349,6 +343,15 @@ viewGeoDataTable model =
           else
             paragraph [] [ text <| String.join " " <| "make -j" :: needed ]
         ]
+
+
+geodataUrl : String -> Int -> String
+geodataUrl threeLetterCode lvl =
+    "geodata/gadm41_"
+        ++ threeLetterCode
+        ++ "_"
+        ++ String.fromInt lvl
+        ++ ".json"
 
 
 viewMap : Model -> List { country : String, location : String, names : List String } -> Element msg
@@ -736,12 +739,7 @@ loadCountry model country =
                         |> List.map
                             (\lvl ->
                                 Http.Tasks.get
-                                    { url =
-                                        "/geodata/gadm41_"
-                                            ++ threeLetterCode
-                                            ++ "_"
-                                            ++ String.fromInt lvl
-                                            ++ ".json"
+                                    { url = geodataUrl threeLetterCode lvl
                                     , resolver = Http.Tasks.resolveJson geoJsonDecoder
                                     }
                             )
@@ -758,8 +756,6 @@ geoJsonDecoder =
     GeoJson.decoder
         |> Json.Decode.andThen
             (\( geoJsonObject, _ ) ->
-                -- "NAME_1": "Kärnten",
-                -- "VARNAME_1": "Carinthia|Caríntia|Carintia",
                 case geoJsonObject of
                     Geometry _ ->
                         Json.Decode.fail "Unexpected geometry"

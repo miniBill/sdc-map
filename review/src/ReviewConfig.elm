@@ -22,6 +22,7 @@ import NoMissingTypeAnnotationInLetIn
 import NoMissingTypeExpose
 import NoPrematureLetComputation
 import NoSimpleLetBody
+import NoUnoptimizedRecursion
 import NoUnused.CustomTypeConstructorArgs
 import NoUnused.CustomTypeConstructors
 import NoUnused.Dependencies
@@ -45,12 +46,14 @@ config =
     , NoMissingTypeAnnotation.rule
     , NoMissingTypeAnnotationInLetIn.rule
     , NoMissingTypeExpose.rule
-    , NoSimpleLetBody.rule
     , NoPrematureLetComputation.rule
-    , NoUnused.CustomTypeConstructors.rule []
+    , NoSimpleLetBody.rule
+    , NoUnoptimizedRecursion.rule (NoUnoptimizedRecursion.optOutWithComment "IGNORE TCO")
     , NoUnused.CustomTypeConstructorArgs.rule
+    , NoUnused.CustomTypeConstructors.rule []
     , NoUnused.Dependencies.rule
     , NoUnused.Exports.rule
+        |> Rule.ignoreErrorsForDirectories [ "src/Svg" ]
     , NoUnused.Parameters.rule
     , NoUnused.Patterns.rule
     , NoUnused.Variables.rule

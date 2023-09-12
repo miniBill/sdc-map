@@ -12,7 +12,7 @@ import Svg.String as Svg exposing (Svg)
 import Svg.String.Attributes as SAttrs
 import Svg.String.Attributes.Extra as EAttrs
 import Theme
-import Types exposing (Country, Model, Msg(..))
+import Types exposing (Model, Msg(..))
 
 
 view : Model -> List { country : String, location : String, names : List String } -> Element Msg
@@ -26,100 +26,11 @@ view model locations =
         north =
             Tuple.second <| winkelTripel ( 0, 90, 0 )
 
-        background : Svg msg
-        background =
-            let
-                winkelWidth : Float
-                winkelWidth =
-                    2 * east
-
-                imageWidth : number
-                imageWidth =
-                    2058
-
-                imageHeight : number
-                imageHeight =
-                    1262
-
-                imageRatio : Float
-                imageRatio =
-                    imageWidth / imageHeight
-
-                height : Float
-                height =
-                    winkelWidth / imageRatio
-            in
-            Svg.node "image"
-                [ EAttrs.href "world.jpg"
-                , SAttrs.width <| EAttrs.percent 100
-                , SAttrs.height <| EAttrs.px height
-                , SAttrs.x <| EAttrs.percent -50
-                , SAttrs.y <| (EAttrs.px <| -height / 2)
-                ]
-                []
-
-        viewPoint : ( ( Float, Float ), List String ) -> Svg msg
-        viewPoint ( ( x, y ), names ) =
-            Svg.circle
-                [ SAttrs.cx (EAttrs.px x)
-                , SAttrs.cy (EAttrs.px y)
-                , SAttrs.r (EAttrs.percent 0.2)
-                ]
-                [ Svg.node "title" [] [ Svg.text <| String.join ", " names ] ]
-
-        countries : List Country
-        countries =
-            locations
-                |> List.map .country
-                |> Set.fromList
-                |> Set.toList
-
-        countriesBorders : Svg msg
-        countriesBorders =
-            countries
-                |> List.filterMap
-                    (\country ->
-                        case Dict.get country model.geoJsonData of
-                            Just (Success countryLocations) ->
-                                List.Extra.find
-                                    (\location -> location.name == country)
-                                    countryLocations
-                                    |> Maybe.map (\{ geometry } -> viewCountryBorders country geometry)
-
-                            _ ->
-                                Nothing
-                    )
-                |> Svg.g
-                    [ SAttrs.stroke <| EAttrs.color Color.black
-                    , SAttrs.strokeWidth <| EAttrs.percent 0.02
-                    ]
-
-        locationDots : Svg msg
-        locationDots =
-            locations
-                |> List.filterMap
-                    (\input ->
-                        case Types.findPosition model input of
-                            Ok pos ->
-                                Just <| viewPoint ( winkelTripelFlip pos, input.names )
-
-                            Err _ ->
-                                case Types.findPosition model { input | location = "" } of
-                                    Ok pos ->
-                                        Just <| viewPoint ( winkelTripelFlip pos, input.names )
-
-                                    Err _ ->
-                                        Nothing
-                    )
-                |> Svg.g
-                    [ SAttrs.fill (EAttrs.color Color.red)
-                    ]
-
         map : List (Svg.Attribute msg) -> Svg.Html msg
         map attrs =
-            [ background
-            , countriesBorders
-            , locationDots
+            [ viewBackground east
+            , viewCountriesBorders model locations
+            , viewLocationDots model locations
             ]
                 |> Svg.svg
                     (EAttrs.viewBox -east -north (2 * east) (2 * north)
@@ -150,6 +61,95 @@ view model locations =
             , label = text "Download"
             }
         ]
+
+
+viewBackground : Float -> Svg msg
+viewBackground east =
+    let
+        winkelWidth : Float
+        winkelWidth =
+            2 * east
+
+        imageWidth : number
+        imageWidth =
+            2058
+
+        imageHeight : number
+        imageHeight =
+            1262
+
+        imageRatio : Float
+        imageRatio =
+            imageWidth / imageHeight
+
+        height : Float
+        height =
+            winkelWidth / imageRatio
+    in
+    Svg.node "image"
+        [ EAttrs.href "world.jpg"
+        , SAttrs.width <| EAttrs.percent 100
+        , SAttrs.height <| EAttrs.px height
+        , SAttrs.x <| EAttrs.percent -50
+        , SAttrs.y <| (EAttrs.px <| -height / 2)
+        ]
+        []
+
+
+viewLocationDots : Model -> List { country : String, location : String, names : List String } -> Svg msg
+viewLocationDots model locations =
+    locations
+        |> List.filterMap
+            (\input ->
+                case Types.findPosition model input of
+                    Ok pos ->
+                        Just <| viewLocationDot ( winkelTripelFlip pos, input.names )
+
+                    Err _ ->
+                        case Types.findPosition model { input | location = "" } of
+                            Ok pos ->
+                                Just <| viewLocationDot ( winkelTripelFlip pos, input.names )
+
+                            Err _ ->
+                                Nothing
+            )
+        |> Svg.g
+            [ SAttrs.fill (EAttrs.color Color.red)
+            ]
+
+
+viewLocationDot : ( ( Float, Float ), List String ) -> Svg msg
+viewLocationDot ( ( x, y ), names ) =
+    Svg.circle
+        [ SAttrs.cx (EAttrs.px x)
+        , SAttrs.cy (EAttrs.px y)
+        , SAttrs.r (EAttrs.percent 0.2)
+        ]
+        [ Svg.node "title" [] [ Svg.text <| String.join ", " names ] ]
+
+
+viewCountriesBorders : Model -> List { a | country : String } -> Svg msg
+viewCountriesBorders model locations =
+    locations
+        |> List.map .country
+        |> Set.fromList
+        |> Set.toList
+        |> List.filterMap
+            (\country ->
+                case Dict.get country model.geoJsonData of
+                    Just (Success countryLocations) ->
+                        List.Extra.find
+                            (\location -> location.name == country)
+                            countryLocations
+                            |> Maybe.map (\{ geometry } -> viewCountryBorders country geometry)
+
+                    _ ->
+                        Nothing
+            )
+        |> Svg.g
+            [ SAttrs.stroke <| EAttrs.color Color.black
+            , SAttrs.strokeWidth <| EAttrs.percent 0.02
+            ]
 
 
 viewCountryBorders : String -> Geometry -> Svg msg
